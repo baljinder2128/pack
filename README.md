@@ -17,7 +17,7 @@ Built with Expo (React Native) and Supabase (database, logins, photo storage, em
 ## One-time setup
 
 1. **Create a Supabase project** at supabase.com (free tier is fine).
-2. **Create the database**: open SQL Editor, paste `supabase/migrations/0001_init.sql`, run it.
+2. **Create the database**: open SQL Editor and run each file in `supabase/migrations/` in order (`0001_init.sql`, then `0002_driver_details.sql`).
 3. **Turn off public sign-ups**: Authentication → Sign In / Providers → disable "Allow new users to sign up".
    Only the office creates logins.
 4. **Create the first office login**: Authentication → Users → Add user (tick auto-confirm), then in SQL Editor:
@@ -51,7 +51,10 @@ npm install
 npx expo run:android   # or run:ios on a Mac; background tracking needs a real build, not Expo Go
 ```
 
-Install on phones without app stores (internal testing):
+Every push also builds the Android app and publishes it at
+**https://baljinder2128.github.io/pack/download/sbt-trucking.apk** (open on an Android phone to install).
+
+Or build with EAS:
 
 ```sh
 npx eas-cli@latest build --profile preview --platform android   # APK link to send to drivers

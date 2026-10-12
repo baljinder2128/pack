@@ -3,6 +3,8 @@ import { useState } from 'react';
 
 import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Segmented, Title, colors } from '@/components/ui';
 import { callFunction, listDrivers } from '@/lib/drivers';
+import { formatDate } from '@/lib/format';
+import { licenceStatus } from '@/lib/licence';
 import { money } from '@/lib/pay';
 import { useFocusQuery } from '@/lib/useQuery';
 
@@ -46,6 +48,9 @@ export default function DriversScreen() {
 
   const active = (data ?? []).filter((d) => d.active);
   const removed = (data ?? []).filter((d) => !d.active);
+  const activeDrivers = active.filter((d) => d.role === 'driver');
+  const office = active.filter((d) => d.role === 'office');
+  const expiring = activeDrivers.filter((d) => licenceStatus(d.licence_expiry)).length;
 
   return (
     <Screen>
@@ -85,18 +90,42 @@ export default function DriversScreen() {
       )}
       <ErrorText>{error}</ErrorText>
       {loading && !data && <Loading />}
-      {active.map((d) => (
-        <Card key={d.id} onPress={() => router.push(`/driver/${d.id}`)}>
-          <Row>
-            <Title>{d.full_name || 'Unnamed'}</Title>
-            {d.role === 'office' && <Badge label="Office" color={colors.primary} />}
-          </Row>
+      {data && (
+        <Card>
+          <Title>
+            {activeDrivers.length} driver{activeDrivers.length === 1 ? '' : 's'} · {office.length} office
+          </Title>
           <Muted>
-            {d.email}
-            {d.hourly_rate ? ` · ${money(d.hourly_rate)}/hr` : ''}
+            {removed.length} removed
+            {expiring ? ` · ${expiring} licence${expiring === 1 ? '' : 's'} expired or expiring in 30 days` : ''}
           </Muted>
+          <Muted>Tap a person to see or change their details.</Muted>
         </Card>
-      ))}
+      )}
+      {active.map((d) => {
+        const lic = licenceStatus(d.licence_expiry);
+        return (
+          <Card key={d.id} onPress={() => router.push(`/driver/${d.id}`)}>
+            <Row>
+              <Title>{d.full_name || 'Unnamed'}</Title>
+              {d.role === 'office' && <Badge label="Office" color={colors.primary} />}
+              {d.on_duty && <Badge label="On duty" color={colors.success} />}
+              {lic && <Badge label={lic.label} color={lic.color} />}
+            </Row>
+            <Muted>
+              {[d.phone, d.email].filter(Boolean).join(' · ')}
+            </Muted>
+            {d.role === 'driver' && (
+              <Muted>
+                {d.licence_class ? `${d.licence_class} licence` : 'No licence on file'}
+                {d.licence_expiry ? ` · expires ${formatDate(d.licence_expiry)}` : ''}
+                {d.hourly_rate ? ` · ${money(d.hourly_rate)}/hr` : ''}
+                {d.abn ? ` · ABN ${d.abn}` : ''}
+              </Muted>
+            )}
+          </Card>
+        );
+      })}
       {removed.length > 0 && <Title>Removed</Title>}
       {removed.map((d) => (
         <Card key={d.id} onPress={() => router.push(`/driver/${d.id}`)}>

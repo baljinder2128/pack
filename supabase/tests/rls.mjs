@@ -17,7 +17,9 @@ alter table storage.objects enable row level security;
 create function storage.foldername(name text) returns text[] language sql as $$ select string_to_array(name, '/') $$;
 grant usage on schema auth, storage, public to authenticated; grant all on storage.objects to authenticated; grant all on sequence storage.objects_id_seq to authenticated;
 `);
-await q(fs.readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), 'utf8'));
+for (const f of fs.readdirSync(new URL('../migrations/', import.meta.url)).sort()) {
+  await q(fs.readFileSync(new URL(`../migrations/${f}`, import.meta.url), 'utf8'));
+}
 await q(`grant all on all tables in schema public to authenticated; grant all on all sequences in schema public to authenticated;`);
 const O='00000000-0000-0000-0000-00000000000a', D='00000000-0000-0000-0000-00000000000d', D2='00000000-0000-0000-0000-0000000000d2';
 await q(`insert into auth.users (id,email,raw_user_meta_data,raw_app_meta_data) values

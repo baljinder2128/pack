@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Linking, Platform, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, ErrorText, Field, colors } from '@/components/ui';
@@ -37,6 +37,14 @@ export default function SignIn() {
           <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" />
           <ErrorText>{error}</ErrorText>
           <Button title="Sign in" onPress={submit} busy={busy} />
+          {Platform.OS === 'web' && (
+            <Text
+              style={{ color: colors.primary, textAlign: 'center', marginTop: 8 }}
+              onPress={() => Linking.openURL('https://baljinder2128.github.io/pack/download/sbt-trucking.apk')}
+            >
+              Driver? Download the Android app
+            </Text>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

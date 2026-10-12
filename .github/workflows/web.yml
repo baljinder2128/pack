@@ -1,6 +1,7 @@
-# Publishes the web version (for the office on Windows/any browser) to
-# GitHub Pages at https://baljinder2128.github.io/pack/
-name: Web app
+# Publishes the app to GitHub Pages at https://baljinder2128.github.io/pack/
+#  - the web version (office use on Windows / any browser), deployed first
+#  - the Android app at /pack/download/sbt-trucking.apk, added once it builds
+name: Publish
 
 on:
   push:
@@ -18,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,22 +28,88 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Check
+        run: |
+          npm run typecheck
+          npm test
+          npm run test:db
       - run: npx expo export --platform web --output-dir dist
       # Single-page app: let GitHub Pages serve the app for any route.
       - run: cp dist/index.html dist/404.html && touch dist/.nojekyll
-      - uses: actions/configure-pages@v5
+      - uses: actions/upload-artifact@v4
         with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
+          name: web-dist
           path: dist
+          include-hidden-files: true
 
-  deploy:
-    needs: build
+  deploy-web:
+    needs: web
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          name: pages-web
+          path: dist
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: pages-web
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+      - name: Build release APK
+        working-directory: android
+        # Phones only need ARM; skipping x86 roughly halves the build time.
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbt-trucking-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+
+  deploy-all:
+    needs: [deploy-web, android]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: sbt-trucking-apk
+          path: apk
+      - run: mkdir -p dist/download && mv apk/app-release.apk dist/download/sbt-trucking.apk
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          name: pages-full
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: pages-full

@@ -15,6 +15,11 @@ export type Profile = {
   tracking_consent_at: string | null;
   on_duty: boolean;
   on_duty_since: string | null;
+  licence_number: string | null;
+  licence_class: string | null;
+  licence_state: string | null;
+  licence_expiry: string | null;
+  start_date: string | null;
 };
 
 export type Company = {
