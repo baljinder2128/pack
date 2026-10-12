@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Text } from 'react-native';
+import { Text } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
 import { formatTime } from '@/lib/format';
@@ -8,6 +8,7 @@ import { toISODate } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import { sendCurrentPosition, startTracking, stopTracking } from '@/lib/tracking';
 import { Button, Card, ErrorText, Muted, Row, Title, colors } from './ui';
+import { alert } from '@/lib/alert';
 
 /** Driver's On duty / Off duty switch. Tracking runs only while on duty. */
 export function DutyCard() {
@@ -59,7 +60,7 @@ export function DutyCard() {
     setBusy(false);
     if (since) {
       const start = new Date(since);
-      Alert.alert('Off duty', 'Log these hours now?', [
+      alert('Off duty', 'Log these hours now?', [
         { text: 'Not now', style: 'cancel' },
         {
           text: 'Log hours',

@@ -2,7 +2,7 @@ import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Image, Pressable, Text, View } from 'react-native';
+import { Image, Platform, Pressable, Text, View } from 'react-native';
 
 import { Button, Card, ErrorText, Field, Muted, Row, Screen, Title, Toggle, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -11,6 +11,7 @@ import { numOrNull } from '@/lib/format';
 import { freshChecklist } from '@/lib/inspection';
 import { supabase } from '@/lib/supabase';
 import type { InspectionItem } from '@/lib/types';
+import { alert } from '@/lib/alert';
 
 function newId(): string {
   // RFC 4122 v4 from Math.random; fine for a storage folder name.
@@ -41,7 +42,7 @@ export default function NewInspection() {
     const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.6 };
     if (source === 'camera') {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) return Alert.alert('Camera permission is needed to take photos.');
+      if (!perm.granted) return alert('Camera permission is needed to take photos.');
     }
     const result =
       source === 'camera'
@@ -63,7 +64,8 @@ export default function NewInspection() {
       for (const [i, uri] of photos.entries()) {
         setStatus(`Uploading photo ${i + 1} of ${photos.length}…`);
         const path = `${session.user.id}/${id}/${i + 1}.jpg`;
-        const bytes = await new File(uri).arrayBuffer();
+        const bytes =
+          Platform.OS === 'web' ? await (await fetch(uri)).arrayBuffer() : await new File(uri).arrayBuffer();
         const { error } = await supabase.storage
           .from('inspection-photos')
           .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
@@ -89,10 +91,10 @@ export default function NewInspection() {
       setStatus('Emailing the office…');
       try {
         await callFunction('send-inspection', { inspection_id: id });
-        Alert.alert('Inspection sent', 'The office has been emailed your inspection.');
+        alert('Inspection sent', 'The office has been emailed your inspection.');
       } catch (e) {
         // The inspection is saved; the office can still see it in the app.
-        Alert.alert(
+        alert(
           'Saved, but email failed',
           `Your inspection is saved and the office can see it in the app. (${e instanceof Error ? e.message : e})`,
         );

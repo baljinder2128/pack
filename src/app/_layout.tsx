@@ -49,7 +49,12 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <StatusBar style="dark" />
-      <RootStack />
+      {/* On a wide screen (the Windows/web version) keep the app a readable width. */}
+      <View style={{ flex: 1, backgroundColor: colors.border }}>
+        <View style={{ flex: 1, width: '100%', maxWidth: 960, alignSelf: 'center' }}>
+          <RootStack />
+        </View>
+      </View>
     </AuthProvider>
   );
 }

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useRef, useState } from 'react';
 import { Linking, Platform, Share, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { Button, Card, Empty, ErrorText, Muted, Row, Screen, Title, colors } from '@/components/ui';
+import { alert } from '@/lib/alert';
 import { formatDateTime, formatTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { mapsLink } from '@/lib/tracking';
@@ -18,6 +19,11 @@ const MAP_HTML = `<!doctype html><html><head>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>html,body,#map{height:100%;margin:0}.lbl{background:#1d4ed8;color:#fff;border:0;font-weight:600}</style>
 </head><body><div id="map"></div><script>
+  // Native: messages go through the WebView bridge. Web: to the parent page.
+  window.send = function (m) {
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(m);
+    else window.parent.postMessage({ sbtMap: m }, '*');
+  };
   var map = L.map('map').setView([-33.87, 151.21], 5);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
   var layer = L.layerGroup().addTo(map);
@@ -28,18 +34,19 @@ const MAP_HTML = `<!doctype html><html><head>
     drivers.forEach(function (d) {
       var m = L.circleMarker([d.lat, d.lng], { radius: 9, color: '#fff', weight: 2, fillColor: '#1d4ed8', fillOpacity: 1 }).addTo(layer);
       m.bindTooltip(d.full_name, { permanent: true, direction: 'top', className: 'lbl', offset: [0, -8] });
-      m.on('click', function () { window.ReactNativeWebView.postMessage(d.driver_id); });
+      m.on('click', function () { window.send(d.driver_id); });
       bounds.push([d.lat, d.lng]);
     });
     if (track && track.length > 1) L.polyline(track, { color: '#b45309', weight: 4 }).addTo(layer);
     if (focus) map.setView(focus, 13);
     else if (!fitted && bounds.length) { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 }); fitted = true; }
   };
-  window.ReactNativeWebView.postMessage('ready');
+  window.send('ready');
 </script></body></html>`;
 
 export default function LiveMap() {
   const web = useRef<WebView>(null);
+  const frame = useRef<HTMLIFrameElement | null>(null);
   const [ready, setReady] = useState(false);
   const [drivers, setDrivers] = useState<LiveDriver[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -85,11 +92,21 @@ export default function LiveMap() {
       .then(({ data }) => setTrack((data ?? []).map((p) => [p.lat, p.lng])));
   }, [selected, drivers]);
 
+  function onMapMessage(msg: string) {
+    if (msg === 'ready') setReady(true);
+    else setSelected(msg);
+  }
+
   useEffect(() => {
     if (!ready) return;
-    web.current?.injectJavaScript(
-      `window.render(${JSON.stringify(drivers)}, ${JSON.stringify(track)}, ${JSON.stringify(focus)}); true;`,
-    );
+    if (Platform.OS === 'web') {
+      const win = frame.current?.contentWindow as (Window & { render?: (...a: unknown[]) => void }) | null;
+      win?.render?.(drivers, track, focus);
+    } else {
+      web.current?.injectJavaScript(
+        `window.render(${JSON.stringify(drivers)}, ${JSON.stringify(track)}, ${JSON.stringify(focus)}); true;`,
+      );
+    }
     if (focus) setFocus(null);
   }, [ready, drivers, track, focus]);
 
@@ -99,34 +116,31 @@ export default function LiveMap() {
   }
 
   async function shareWithCustomer(d: LiveDriver) {
-    await Share.share({
-      message:
-        `Delivery update from SBT Trucking: your driver ${d.full_name.split(' ')[0]} was here at ` +
-        `${formatTime(d.recorded_at)}: ${mapsLink(d.lat, d.lng)}`,
-    });
-  }
-
-  if (Platform.OS === 'web') {
-    return (
-      <Screen>
-        <Empty>The live map is available in the Android and iOS apps.</Empty>
-      </Screen>
-    );
+    const message =
+      `Delivery update from SBT Trucking: your driver ${d.full_name.split(' ')[0]} was here at ` +
+      `${formatTime(d.recorded_at)}: ${mapsLink(d.lat, d.lng)}`;
+    try {
+      await Share.share({ message });
+    } catch {
+      // Browsers without a share sheet: copy it so it can be pasted into an email or text.
+      await navigator.clipboard?.writeText(message);
+      alert('Copied', 'The location message is copied. Paste it into an email or text to your customer.');
+    }
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ height: '50%' }}>
-        <WebView
-          ref={web}
-          originWhitelist={['*']}
-          source={{ html: MAP_HTML }}
-          onMessage={(e) => {
-            const msg = e.nativeEvent.data;
-            if (msg === 'ready') setReady(true);
-            else setSelected(msg);
-          }}
-        />
+        {Platform.OS === 'web' ? (
+          <WebMap frame={frame} onMessage={onMapMessage} />
+        ) : (
+          <WebView
+            ref={web}
+            originWhitelist={['*']}
+            source={{ html: MAP_HTML }}
+            onMessage={(e) => onMapMessage(e.nativeEvent.data)}
+          />
+        )}
       </View>
       <Screen>
         <Muted>
@@ -166,4 +180,27 @@ export default function LiveMap() {
       </Screen>
     </View>
   );
+}
+
+/** Web (Windows browser) version of the map: the same page in an iframe. */
+function WebMap({
+  frame,
+  onMessage,
+}: {
+  frame: React.RefObject<HTMLIFrameElement | null>;
+  onMessage: (msg: string) => void;
+}) {
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.source === frame.current?.contentWindow && typeof e.data?.sbtMap === 'string') onMessage(e.data.sbtMap);
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [frame, onMessage]);
+  return createElement('iframe', {
+    ref: frame,
+    srcDoc: MAP_HTML,
+    title: 'Live map',
+    style: { border: 0, width: '100%', height: '100%' },
+  });
 }

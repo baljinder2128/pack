@@ -37,6 +37,13 @@ Built with Expo (React Native) and Supabase (database, logins, photo storage, em
    (Project Settings → API).
 7. Sign in as the office user, then fill in **More → Company details** (name, ABN, address for the RCTI).
 
+## Windows (or any computer)
+
+The office can use the app in a web browser at **https://baljinder2128.github.io/pack/**.
+It is rebuilt automatically on every push. In Edge or Chrome, use the "Install app" icon in the
+address bar to add it to the Start menu like a normal Windows app. Driver tracking and the
+on-duty switch only work in the phone app.
+
 ## Running and installing
 
 ```sh

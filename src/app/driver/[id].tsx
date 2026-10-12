@@ -1,6 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 
 import { Button, Card, ErrorText, Field, Loading, Muted, Screen, Segmented, Title, Toggle } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -9,6 +8,7 @@ import { numOrNull } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Role } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
+import { alert } from '@/lib/alert';
 
 // Office view of one person: pay rate, RCTI details, and removing their login.
 export default function DriverScreen() {
@@ -63,7 +63,7 @@ export default function DriverScreen() {
     }, 'Saved.');
 
   function remove() {
-    Alert.alert(
+    alert(
       `Remove ${driver?.full_name}?`,
       'They will be signed out and can no longer log in. Their trips, hours and RCTIs are kept.',
       [

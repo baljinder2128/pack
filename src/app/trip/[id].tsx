@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Text } from 'react-native';
+import { Text } from 'react-native';
 
 import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Title } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -10,6 +10,7 @@ import { money } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import type { Trip } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
+import { alert } from '@/lib/alert';
 
 async function currentPosition(): Promise<{ lat: number; lng: number } | null> {
   const { status } = await Location.requestForegroundPermissionsAsync();
@@ -83,7 +84,7 @@ export default function TripDetail() {
   }
 
   function remove() {
-    Alert.alert('Delete trip?', 'This cannot be undone.', [
+    alert('Delete trip?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',

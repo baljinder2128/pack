@@ -21,7 +21,12 @@
       "package": "com.sbt.trucking"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "name": "SBT Trucking",
+      "shortName": "SBT Trucking",
+      "themeColor": "#1d4ed8",
+      "backgroundColor": "#f4f5f7"
     },
     "plugins": [
       "expo-router",
@@ -50,6 +55,9 @@
         "projectId": "cb394967-c86e-42d8-87bd-1dbfdb08169c"
       }
     },
-    "owner": "sbt-trucking"
+    "owner": "sbt-trucking",
+    "experiments": {
+      "baseUrl": "/pack"
+    }
   }
 }

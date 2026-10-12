@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Text } from 'react-native';
+import { Text } from 'react-native';
 
 import { WeekNav } from '@/components/WeekNav';
 import { Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
@@ -10,6 +10,7 @@ import { round2, shiftHours, toISODate, weekEnd, weekStart } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import type { Shift } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
+import { alert } from '@/lib/alert';
 
 export default function HoursScreen() {
   const { isOffice } = useAuth();
@@ -35,7 +36,7 @@ export default function HoursScreen() {
   }
 
   function remove(shift: Shift) {
-    Alert.alert('Delete these hours?', `${formatDate(shift.shift_date)} ${formatTime(shift.start_at)}–${formatTime(shift.end_at)}`, [
+    alert('Delete these hours?', `${formatDate(shift.shift_date)} ${formatTime(shift.start_at)}–${formatTime(shift.end_at)}`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
