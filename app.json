@@ -49,6 +49,7 @@
       "eas": {
         "projectId": "cb394967-c86e-42d8-87bd-1dbfdb08169c"
       }
-    }
+    },
+    "owner": "sbt-trucking"
   }
 }
