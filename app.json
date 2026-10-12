@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "SBT Trucking",
+    "slug": "sbt-trucking",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sbt.trucking"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.sbt.trucking"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sharing",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SBT Trucking shows your location to the office while you are on duty.",
+          "locationAlwaysAndWhenInUsePermission": "SBT Trucking keeps sharing your location with the office while you are on duty, even when the app is closed. Go off duty to stop.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "SBT Trucking uses the camera to photograph pre-trip inspection issues.",
+          "photosPermission": "SBT Trucking attaches photos to pre-trip inspection reports."
+        }
+      ]
+    ],
+    "scheme": "sbttrucking"
+  }
+}

@@ -1,0 +1,176 @@
+import { File } from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { Alert, Image, Pressable, Text, View } from 'react-native';
+
+import { Button, Card, ErrorText, Field, Muted, Row, Screen, Title, Toggle, colors } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
+import { callFunction } from '@/lib/drivers';
+import { numOrNull } from '@/lib/format';
+import { freshChecklist } from '@/lib/inspection';
+import { supabase } from '@/lib/supabase';
+import type { InspectionItem } from '@/lib/types';
+
+function newId(): string {
+  // RFC 4122 v4 from Math.random; fine for a storage folder name.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+export default function NewInspection() {
+  const params = useLocalSearchParams<{ trip_id?: string; truck?: string; trailer?: string }>();
+  const { session } = useAuth();
+  const [truck, setTruck] = useState(params.truck ?? '');
+  const [trailer, setTrailer] = useState(params.trailer ?? '');
+  const [odometer, setOdometer] = useState('');
+  const [items, setItems] = useState<InspectionItem[]>(freshChecklist);
+  const [safe, setSafe] = useState(true);
+  const [notes, setNotes] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const setItem = (key: string, patch: Partial<InspectionItem>) =>
+    setItems((list) => list.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+
+  async function addPhoto(source: 'camera' | 'library') {
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.6 };
+    if (source === 'camera') {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) return Alert.alert('Camera permission is needed to take photos.');
+    }
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync(options)
+        : await ImagePicker.launchImageLibraryAsync({ ...options, allowsMultipleSelection: true, selectionLimit: 10 });
+    if (!result.canceled) setPhotos((p) => [...p, ...result.assets.map((a) => a.uri)]);
+  }
+
+  async function submit() {
+    if (!session) return;
+    if (!truck.trim()) return setError('Enter the truck rego.');
+    const missingNote = items.find((it) => !it.ok && !it.note.trim());
+    if (missingNote) return setError(`Describe the problem with "${missingNote.label}".`);
+    setError(null);
+    setBusy(true);
+    try {
+      const id = newId();
+      const paths: string[] = [];
+      for (const [i, uri] of photos.entries()) {
+        setStatus(`Uploading photo ${i + 1} of ${photos.length}…`);
+        const path = `${session.user.id}/${id}/${i + 1}.jpg`;
+        const bytes = await new File(uri).arrayBuffer();
+        const { error } = await supabase.storage
+          .from('inspection-photos')
+          .upload(path, bytes, { contentType: 'image/jpeg', upsert: true });
+        if (error) throw new Error(`Photo upload failed: ${error.message}`);
+        paths.push(path);
+      }
+
+      setStatus('Saving inspection…');
+      const { error: insertError } = await supabase.from('inspections').insert({
+        id,
+        driver_id: session.user.id,
+        trip_id: params.trip_id || null,
+        truck_rego: truck.trim().toUpperCase(),
+        trailer_rego: trailer.trim().toUpperCase() || null,
+        odometer: numOrNull(odometer),
+        items,
+        safe_to_drive: safe,
+        notes: notes.trim() || null,
+        photo_paths: paths,
+      });
+      if (insertError) throw new Error(insertError.message);
+
+      setStatus('Emailing the office…');
+      try {
+        await callFunction('send-inspection', { inspection_id: id });
+        Alert.alert('Inspection sent', 'The office has been emailed your inspection.');
+      } catch (e) {
+        // The inspection is saved; the office can still see it in the app.
+        Alert.alert(
+          'Saved, but email failed',
+          `Your inspection is saved and the office can see it in the app. (${e instanceof Error ? e.message : e})`,
+        );
+      }
+      router.back();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+      setStatus(null);
+    }
+  }
+
+  const defects = items.filter((it) => !it.ok).length;
+
+  return (
+    <Screen>
+      <Field label="Truck rego" value={truck} onChangeText={setTruck} autoCapitalize="characters" />
+      <Field label="Trailer rego" value={trailer} onChangeText={setTrailer} autoCapitalize="characters" />
+      <Field label="Odometer (km)" value={odometer} onChangeText={setOdometer} keyboardType="number-pad" />
+
+      <Title>Checks</Title>
+      <Muted>Tap "Problem" on anything that needs reporting and describe it.</Muted>
+      {items.map((it) => (
+        <Card key={it.key}>
+          <Row>
+            <Text style={{ flex: 1, fontSize: 15, fontWeight: '600' }}>{it.label}</Text>
+            <Choice label="OK" active={it.ok} color={colors.success} onPress={() => setItem(it.key, { ok: true })} />
+            <Choice label="Problem" active={!it.ok} color={colors.danger} onPress={() => setItem(it.key, { ok: false })} />
+          </Row>
+          {!it.ok && (
+            <Field label="What's wrong?" value={it.note} onChangeText={(note) => setItem(it.key, { note })} multiline />
+          )}
+        </Card>
+      ))}
+
+      <Title>Photos</Title>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {photos.map((uri, i) => (
+          <Pressable key={uri + i} onLongPress={() => setPhotos((p) => p.filter((_, j) => j !== i))}>
+            <Image source={{ uri }} style={{ width: 96, height: 96, borderRadius: 8 }} />
+          </Pressable>
+        ))}
+      </View>
+      {photos.length > 0 && <Muted>Press and hold a photo to remove it.</Muted>}
+      <Row>
+        <View style={{ flex: 1 }}>
+          <Button title="Take photo" variant="secondary" onPress={() => addPhoto('camera')} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button title="From gallery" variant="secondary" onPress={() => addPhoto('library')} />
+        </View>
+      </Row>
+
+      <Field label="Other notes" value={notes} onChangeText={setNotes} multiline />
+      <Toggle label="Vehicle is safe to drive" value={safe} onChange={setSafe} />
+      {defects > 0 && <Text style={{ color: colors.warning }}>{defects} problem(s) will be reported.</Text>}
+      <ErrorText>{error}</ErrorText>
+      {status && <Muted>{status}</Muted>}
+      <Button title="Submit & email office" onPress={submit} busy={busy} />
+    </Screen>
+  );
+}
+
+function Choice({ label, active, color, onPress }: { label: string; active: boolean; color: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: active ? color : colors.border,
+        backgroundColor: active ? color : colors.card,
+      }}
+    >
+      <Text style={{ color: active ? '#fff' : colors.text, fontWeight: '600' }}>{label}</Text>
+    </Pressable>
+  );
+}

@@ -1,0 +1,169 @@
+import { useEffect, useRef, useState } from 'react';
+import { Linking, Platform, Share, Text, View } from 'react-native';
+import { WebView } from 'react-native-webview';
+
+import { Button, Card, Empty, ErrorText, Muted, Row, Screen, Title, colors } from '@/components/ui';
+import { formatDateTime, formatTime } from '@/lib/format';
+import { supabase } from '@/lib/supabase';
+import { mapsLink } from '@/lib/tracking';
+import type { LiveDriver } from '@/lib/types';
+
+const REFRESH_MS = 30 * 1000;
+
+// OpenStreetMap via Leaflet: no API key needed. `window.render` is called from
+// React Native with the latest positions and the selected driver's track.
+const MAP_HTML = `<!doctype html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>html,body,#map{height:100%;margin:0}.lbl{background:#1d4ed8;color:#fff;border:0;font-weight:600}</style>
+</head><body><div id="map"></div><script>
+  var map = L.map('map').setView([-33.87, 151.21], 5);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+  var layer = L.layerGroup().addTo(map);
+  var fitted = false;
+  window.render = function (drivers, track, focus) {
+    layer.clearLayers();
+    var bounds = [];
+    drivers.forEach(function (d) {
+      var m = L.circleMarker([d.lat, d.lng], { radius: 9, color: '#fff', weight: 2, fillColor: '#1d4ed8', fillOpacity: 1 }).addTo(layer);
+      m.bindTooltip(d.full_name, { permanent: true, direction: 'top', className: 'lbl', offset: [0, -8] });
+      m.on('click', function () { window.ReactNativeWebView.postMessage(d.driver_id); });
+      bounds.push([d.lat, d.lng]);
+    });
+    if (track && track.length > 1) L.polyline(track, { color: '#b45309', weight: 4 }).addTo(layer);
+    if (focus) map.setView(focus, 13);
+    else if (!fitted && bounds.length) { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 }); fitted = true; }
+  };
+  window.ReactNativeWebView.postMessage('ready');
+</script></body></html>`;
+
+export default function LiveMap() {
+  const web = useRef<WebView>(null);
+  const [ready, setReady] = useState(false);
+  const [drivers, setDrivers] = useState<LiveDriver[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [track, setTrack] = useState<[number, number][]>([]);
+  const [focus, setFocus] = useState<[number, number] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [updated, setUpdated] = useState<Date | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      const { data, error } = await supabase.from('live_drivers').select('*').order('full_name');
+      if (!alive) return;
+      if (error) setError(error.message);
+      else {
+        setDrivers((data ?? []) as LiveDriver[]);
+        setError(null);
+        setUpdated(new Date());
+      }
+    }
+    load();
+    const timer = setInterval(load, REFRESH_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  // Track for the selected driver since they went on duty.
+  useEffect(() => {
+    const d = drivers.find((x) => x.driver_id === selected);
+    if (!d) {
+      setTrack([]);
+      return;
+    }
+    supabase
+      .from('driver_locations')
+      .select('lat,lng')
+      .eq('driver_id', d.driver_id)
+      .gte('recorded_at', d.on_duty_since)
+      .order('recorded_at')
+      .limit(2000)
+      .then(({ data }) => setTrack((data ?? []).map((p) => [p.lat, p.lng])));
+  }, [selected, drivers]);
+
+  useEffect(() => {
+    if (!ready) return;
+    web.current?.injectJavaScript(
+      `window.render(${JSON.stringify(drivers)}, ${JSON.stringify(track)}, ${JSON.stringify(focus)}); true;`,
+    );
+    if (focus) setFocus(null);
+  }, [ready, drivers, track, focus]);
+
+  function select(d: LiveDriver) {
+    setSelected(d.driver_id);
+    setFocus([d.lat, d.lng]);
+  }
+
+  async function shareWithCustomer(d: LiveDriver) {
+    await Share.share({
+      message:
+        `Delivery update from SBT Trucking: your driver ${d.full_name.split(' ')[0]} was here at ` +
+        `${formatTime(d.recorded_at)}: ${mapsLink(d.lat, d.lng)}`,
+    });
+  }
+
+  if (Platform.OS === 'web') {
+    return (
+      <Screen>
+        <Empty>The live map is available in the Android and iOS apps.</Empty>
+      </Screen>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={{ height: '50%' }}>
+        <WebView
+          ref={web}
+          originWhitelist={['*']}
+          source={{ html: MAP_HTML }}
+          onMessage={(e) => {
+            const msg = e.nativeEvent.data;
+            if (msg === 'ready') setReady(true);
+            else setSelected(msg);
+          }}
+        />
+      </View>
+      <Screen>
+        <Muted>
+          {drivers.length} driver(s) on duty{updated ? ` · updated ${formatTime(updated.toISOString())}` : ''}
+        </Muted>
+        <ErrorText>{error}</ErrorText>
+        {drivers.length === 0 && <Empty>No drivers are on duty right now.</Empty>}
+        {drivers.map((d) => {
+          const stale = Date.now() - new Date(d.recorded_at).getTime() > 10 * 60 * 1000;
+          return (
+            <Card key={d.driver_id} onPress={() => select(d)}>
+              <Row>
+                <Title>{d.full_name}</Title>
+                {selected === d.driver_id && <Text style={{ color: colors.warning, marginLeft: 'auto' }}>Showing route</Text>}
+              </Row>
+              <Muted>
+                Last seen {formatDateTime(d.recorded_at)}
+                {d.speed ? ` · ${Math.round(d.speed * 3.6)} km/h` : ''}
+              </Muted>
+              {stale && <Text style={{ color: colors.warning }}>No update for over 10 minutes (no signal or phone off).</Text>}
+              <Row>
+                <View style={{ flex: 1 }}>
+                  <Button title="Google Maps" variant="secondary" onPress={() => Linking.openURL(mapsLink(d.lat, d.lng))} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button title="Send to customer" onPress={() => shareWithCustomer(d)} />
+                </View>
+              </Row>
+              {d.phone && (
+                <Text style={{ color: colors.primary }} onPress={() => Linking.openURL(`tel:${d.phone}`)}>
+                  Call {d.phone}
+                </Text>
+              )}
+            </Card>
+          );
+        })}
+      </Screen>
+    </View>
+  );
+}
