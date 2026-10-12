@@ -33,7 +33,7 @@ Built with Expo (React Native) and Supabase (database, logins, photo storage, em
    npx supabase functions deploy send-inspection
    npx supabase functions deploy manage-driver
    ```
-6. **Point the app at Supabase**: copy `.env.example` to `.env.local` and fill in the URL and anon key
+6. **Point the app at Supabase**: `.env` holds the project URL and publishable (anon) key. To use a different project, override them in `.env.local`
    (Project Settings → API).
 7. Sign in as the office user, then fill in **More → Company details** (name, ABN, address for the RCTI).
 
