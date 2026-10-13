@@ -111,10 +111,12 @@ export function PayslipPanel({
       const { error: uploadError } = await supabase.storage
         .from('payslip-pdfs')
         .upload(path, pdf, { contentType: 'application/pdf', upsert: true });
-      if (uploadError) throw new Error(`Payslip #${p.number} is issued, but saving the PDF failed: ${uploadError.message}`);
-      await supabase.from('payslips').update({ pdf_path: path }).eq('id', p.id);
+      // Still email it if the archive copy can't be saved (e.g. the bucket isn't set up yet).
+      if (!uploadError) await supabase.from('payslips').update({ pdf_path: path }).eq('id', p.id);
       q.reload();
       await email(p, pdf);
+      if (uploadError)
+        throw new Error(`Payslip #${p.number} was emailed, but it couldn't be saved to the archive: ${uploadError.message}. Run the 0006 SQL in Supabase, then re-issue.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

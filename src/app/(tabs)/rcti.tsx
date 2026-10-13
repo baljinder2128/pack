@@ -103,10 +103,12 @@ export default function RctiScreen() {
       const { error: uploadError } = await supabase.storage
         .from('rcti-pdfs')
         .upload(path, pdf, { contentType: 'application/pdf', upsert: true });
-      if (uploadError) throw new Error(`RCTI #${rcti.number} is issued, but saving the PDF failed: ${uploadError.message}`);
-      await supabase.from('rctis').update({ pdf_path: path }).eq('id', rcti.id);
+      // Still email it if the archive copy can't be saved (e.g. the bucket isn't set up yet).
+      if (!uploadError) await supabase.from('rctis').update({ pdf_path: path }).eq('id', rcti.id);
       week.reload();
       await emailRcti(rcti, pdf);
+      if (uploadError)
+        throw new Error(`RCTI #${rcti.number} was emailed, but it couldn't be saved to the archive: ${uploadError.message}. Run the 0005 SQL in Supabase, then re-issue.`);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
     } finally {

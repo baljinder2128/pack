@@ -10,6 +10,23 @@ export const TRACKING_TASK = 'sbt-duty-tracking';
 
 type LocationTaskData = { locations: Location.LocationObject[] };
 
+// What happened to the last position we tried to send, so the driver can see
+// on screen whether the office is getting their location.
+export type SendStatus = { at: number; error: string | null };
+let lastStatus: SendStatus | null = null;
+const listeners = new Set<(s: SendStatus) => void>();
+function report(error: { message: string } | null | undefined) {
+  lastStatus = { at: Date.now(), error: error ? error.message : null };
+  listeners.forEach((l) => l(lastStatus!));
+}
+export function getSendStatus(): SendStatus | null {
+  return lastStatus;
+}
+export function onSendStatus(listener: (s: SendStatus) => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 if (Platform.OS !== 'web') {
   TaskManager.defineTask<LocationTaskData>(TRACKING_TASK, async ({ data, error }) => {
     if (error || !data?.locations?.length) return;
@@ -27,6 +44,7 @@ if (Platform.OS !== 'web') {
       recorded_at: new Date(l.timestamp).toISOString(),
     }));
     const { error: insertError } = await supabase.from('driver_locations').insert(rows);
+    report(insertError);
     // RLS rejects inserts once the driver is off duty; stop the task then.
     if (insertError?.code === '42501') {
       await stopTracking();
@@ -84,7 +102,7 @@ export async function sendCurrentPosition(userId: string): Promise<void> {
   if (Platform.OS === 'web') return; // the web watcher sends its first fix straight away
   try {
     const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    await supabase.from('driver_locations').insert({
+    const { error } = await supabase.from('driver_locations').insert({
       driver_id: userId,
       lat: pos.coords.latitude,
       lng: pos.coords.longitude,
@@ -92,8 +110,10 @@ export async function sendCurrentPosition(userId: string): Promise<void> {
       speed: pos.coords.speed,
       heading: pos.coords.heading,
     });
-  } catch {
+    report(error);
+  } catch (e) {
     // The background task will catch up.
+    report({ message: e instanceof Error ? e.message : String(e) });
   }
 }
 
@@ -147,6 +167,7 @@ function startWebTracking(): Promise<string | null> {
           speed: pos.coords.speed,
           heading: pos.coords.heading,
         });
+        report(error);
         if (error?.code === '42501') return stopWebTracking();
         await supabase
           .from('trips')

@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { formatTime } from '@/lib/format';
 import { toISODate } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
-import { sendCurrentPosition, startTracking, stopTracking } from '@/lib/tracking';
+import { getSendStatus, onSendStatus, sendCurrentPosition, startTracking, stopTracking, type SendStatus } from '@/lib/tracking';
 import { Button, Card, ErrorText, Muted, Row, Title, colors } from './ui';
 import { alert } from '@/lib/alert';
 
@@ -15,6 +15,8 @@ export function DutyCard() {
   const { profile, refreshProfile } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState<SendStatus | null>(getSendStatus());
+  useEffect(() => onSendStatus(setSent), []);
 
   // If the app was reinstalled or permissions reset while on duty, restart tracking.
   useEffect(() => {
@@ -95,6 +97,14 @@ export function DutyCard() {
           gets a warning.
         </Text>
       )}
+      {profile.on_duty && sent && (
+        <Text style={{ color: sent.error ? colors.danger : colors.success, fontWeight: '600' }}>
+          {sent.error
+            ? `Your location did not reach the office: ${sent.error}`
+            : `Location sent to the office at ${formatTime(new Date(sent.at).toISOString())}`}
+        </Text>
+      )}
+      {profile.on_duty && !sent && <Muted>Waiting for your first location fix…</Muted>}
       <ErrorText>{error}</ErrorText>
       {profile.on_duty ? (
         <Button title="Go off duty" variant="danger" onPress={goOffDuty} busy={busy} />
