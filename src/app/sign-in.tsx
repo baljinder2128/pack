@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Linking, Platform, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Linking, Platform, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, ErrorText, Field, Muted, colors } from '@/components/ui';
@@ -24,8 +24,14 @@ export default function SignIn() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={{ flex: 1, justifyContent: 'center', padding: 24, gap: 14 }}>
-          <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text }}>SBT Trucking</Text>
-          <Text style={{ color: colors.muted }}>Sign in with the login the office gave you.</Text>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={{ width: 160, height: 100, alignSelf: 'center' }}
+            resizeMode="contain"
+            accessibilityLabel="SBT logo"
+          />
+          <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text, textAlign: 'center' }}>SBT Trucking</Text>
+          <Text style={{ color: colors.muted, textAlign: 'center' }}>Sign in with the login the office gave you.</Text>
           <Field
             label="Email"
             value={email}

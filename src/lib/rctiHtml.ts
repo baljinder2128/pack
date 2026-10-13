@@ -1,4 +1,5 @@
 import { formatDate } from './format';
+import { LOGO_DATA_URI } from './logo';
 import { money, type RctiTotals } from './pay';
 import type { Company, Profile } from './types';
 
@@ -54,6 +55,7 @@ export function rctiHtml(opts: {
   .agreement { margin-top: 24px; font-size: 10px; color: #444; }
 </style></head>
 <body>
+  <img src="${LOGO_DATA_URI}" alt="SBT" style="height:56px;float:right" />
   <h1>Recipient Created Tax Invoice</h1>
   <div>RCTI no. ${number ?? 'DRAFT'} &middot; Issued ${esc(new Date(issuedAt).toLocaleDateString('en-AU'))}
     &middot; Period ${esc(formatDate(weekStart))} to ${esc(formatDate(weekEnd))}</div>
