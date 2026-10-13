@@ -15,6 +15,9 @@
 //   { runsheet_id }  -> a driver submitted their end-of-day runsheet or a fuel docket:
 //                       email the photos to the office. Needs the driver's sign-in.
 //   { trip_id }      -> a driver accepted a load the office planned: tell the office.
+//
+// The daily check also deletes the photos of runsheets, fuel dockets and inspections
+// that were checked or archived more than 2 months ago. The records themselves stay.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.16';
 
@@ -259,6 +262,10 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Two months after a runsheet/fuel docket is checked or an inspection is archived,
+  // its photos are deleted to save space. The record (dates, regos, notes, litres) is kept.
+  const photosRemoved = await removeOldPhotos(admin).catch((e) => `failed: ${e instanceof Error ? e.message : e}`);
+
   // Daily check: active drivers whose licence expires within 7 days (or has expired)
   // and haven't been alerted for this expiry date yet.
   const now = today();
@@ -271,7 +278,7 @@ Deno.serve(async (req) => {
     .lte('licence_expiry', addDays(now, 7));
   if (error) return json({ error: error.message }, 500);
   const fresh = (due ?? []).filter((d) => d.licence_alert_sent_for !== d.licence_expiry);
-  if (!fresh.length) return json({ ok: true, alerted: 0 });
+  if (!fresh.length) return json({ ok: true, alerted: 0, photosRemoved });
 
   const rows = fresh
     .sort((a, b) => a.licence_expiry.localeCompare(b.licence_expiry))
@@ -303,5 +310,31 @@ Deno.serve(async (req) => {
     return json({ error: e instanceof Error ? e.message : String(e) }, 502);
   }
   for (const d of fresh) await admin.from('profiles').update({ licence_alert_sent_for: d.licence_expiry }).eq('id', d.id);
-  return json({ ok: true, alerted: fresh.length });
+  return json({ ok: true, alerted: fresh.length, photosRemoved });
 });
+
+// deno-lint-ignore no-explicit-any
+async function removeOldPhotos(admin: any): Promise<number> {
+  const cutoff = new Date(Date.now() - 61 * 86400_000).toISOString();
+  let removed = 0;
+  for (const [table, bucket, done] of [
+    ['runsheets', 'runsheet-photos', 'reviewed_at'],
+    ['inspections', 'inspection-photos', 'archived_at'],
+  ] as const) {
+    const { data, error } = await admin
+      .from(table)
+      .select('id, photo_paths')
+      .lt(done, cutoff)
+      .neq('photo_paths', '{}')
+      .limit(200);
+    if (error) throw new Error(`${table}: ${error.message}`);
+    for (const row of data ?? []) {
+      const paths: string[] = row.photo_paths ?? [];
+      const { error: e } = await admin.storage.from(bucket).remove(paths);
+      if (e) throw new Error(`${bucket}: ${e.message}`);
+      await admin.from(table).update({ photo_paths: [] }).eq('id', row.id);
+      removed += paths.length;
+    }
+  }
+  return removed;
+}
