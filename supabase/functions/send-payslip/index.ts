@@ -3,11 +3,15 @@
 //
 // Deploy in the Supabase dashboard (Edge Functions > Deploy a new function),
 // name it send-payslip and turn Verify JWT off: the caller is checked below.
-// Uses the same RESEND_API_KEY secret as send-inspection.
-// Optional secrets: RCTI_EMAIL (office copy, default sbtruckin@outlook.com), EMAIL_FROM.
+// Sends from Gmail when the GMAIL_USER and GMAIL_APP_PASSWORD secrets are set
+// (an app password from myaccount.google.com/apppasswords, not the normal
+// Gmail password). Otherwise uses Resend (RESEND_API_KEY), which only reaches
+// the office until a domain is verified there.
+// Optional secret: RCTI_EMAIL (office copy, default sbtruckin@outlook.com).
 //
 // Body: { payslip_id, pdf_base64 }
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import nodemailer from 'npm:nodemailer@6.9.16';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,8 +51,6 @@ Deno.serve(async (req) => {
     .single();
   if (error || !slip) return json({ error: error?.message ?? 'Payslip not found' }, 404);
 
-  const resendKey = Deno.env.get('RESEND_API_KEY');
-  if (!resendKey) return json({ error: 'Email is not configured on the server' }, 500);
   const office = Deno.env.get('RCTI_EMAIL') ?? 'sbtruckin@outlook.com';
   const from = Deno.env.get('EMAIL_FROM') ?? 'SBT Truckin <onboarding@resend.dev>';
   const name = slip.employee?.full_name ?? 'Employee';
@@ -64,6 +66,38 @@ Deno.serve(async (req) => {
     <p style="margin:0 0 4px"><b>Super:</b> ${money(slip.super)}</p>
     <p>SBT Truckin</p>`;
 
+  const subject = `Payslip #${slip.number} - ${name} - week ${period}`;
+  const filename = `Payslip-${slip.number}-${name.replace(/[^A-Za-z0-9]+/g, '-')}.pdf`;
+  const cc = to[0] === office ? undefined : [office];
+
+  const gmailUser = Deno.env.get('GMAIL_USER');
+  const gmailPass = Deno.env.get('GMAIL_APP_PASSWORD');
+  if (gmailUser && gmailPass) {
+    // Port 465 (SSL): Supabase blocks outgoing 25 and 587.
+    const mailer = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: { user: gmailUser, pass: gmailPass.replace(/\s/g, '') },
+    });
+    try {
+      await mailer.sendMail({
+        from: `SBT Truckin <${gmailUser}>`,
+        replyTo: office,
+        to,
+        cc,
+        subject,
+        html,
+        attachments: [{ filename, content: pdf_base64, encoding: 'base64', contentType: 'application/pdf' }],
+      });
+      return json({ ok: true, to: to[0] });
+    } catch (e) {
+      return json({ error: `Gmail could not send it: ${e instanceof Error ? e.message : e}` }, 502);
+    }
+  }
+
+  const resendKey = Deno.env.get('RESEND_API_KEY');
+  if (!resendKey) return json({ error: 'Email is not configured on the server' }, 500);
   const send = (recipients: string[], cc?: string[]) =>
     fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -72,13 +106,13 @@ Deno.serve(async (req) => {
         from,
         to: recipients,
         cc,
-        subject: `Payslip #${slip.number} - ${name} - week ${period}`,
+        subject,
         html,
-        attachments: [{ filename: `Payslip-${slip.number}-${name.replace(/[^A-Za-z0-9]+/g, '-')}.pdf`, content: pdf_base64 }],
+        attachments: [{ filename, content: pdf_base64 }],
       }),
     });
 
-  const res = await send(to, to[0] === office ? undefined : [office]);
+  const res = await send(to, cc);
   if (res.ok) return json({ ok: true, to: to[0] });
   const reason = (await res.text()).slice(0, 300);
   // Until a domain is verified in Resend, it only delivers to the account's
