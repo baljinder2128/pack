@@ -1,6 +1,6 @@
 /** Digits only, e.g. "51 824 753 556" -> "51824753556". */
-export function cleanAbn(s: string): string {
-  return s.replace(/\D/g, '');
+export function cleanAbn(s: string | null | undefined): string {
+  return String(s ?? '').replace(/\D/g, '');
 }
 
 /** Checks the ABN check digits (ATO weighting rule), so typos are caught before a lookup. */
@@ -13,7 +13,7 @@ export function isValidAbn(s: string): boolean {
 }
 
 /** "51824753556" -> "51 824 753 556". */
-export function formatAbn(s: string): string {
+export function formatAbn(s: string | null | undefined): string {
   const d = cleanAbn(s);
-  return d.length === 11 ? `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 8)} ${d.slice(8)}` : s;
+  return d.length === 11 ? `${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 8)} ${d.slice(8)}` : String(s ?? '');
 }

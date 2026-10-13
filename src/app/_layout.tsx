@@ -8,6 +8,9 @@ import { isConfigured } from '@/lib/supabase';
 // Registers the background location task at startup.
 import '@/lib/tracking';
 
+// If a screen crashes, show the error and a Retry button instead of a blank page.
+export { ErrorBoundary } from 'expo-router';
+
 function RootStack() {
   const { session, loading } = useAuth();
   if (loading) return <Loading />;

@@ -17,6 +17,30 @@ export type AbnResult = {
   postcode: string;
 };
 
+const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v));
+
+/** Checks the lookup's answer has what we need, so a bad reply can't crash the screen. */
+function toResult(data: unknown, abn: string): AbnResult {
+  const d = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+  const entityName = str(d.entityName).trim();
+  if (!entityName) {
+    throw new Error(
+      'The ABN lookup did not return a business name. Check the abn-lookup function in Supabase has the SBT code and the ABR_GUID secret.',
+    );
+  }
+  return {
+    abn: str(d.abn) || abn,
+    status: str(d.status) || 'Unknown',
+    entityName,
+    entityType: str(d.entityType),
+    businessNames: Array.isArray(d.businessNames) ? d.businessNames.map(str).filter(Boolean) : [],
+    gstRegistered: d.gstRegistered === true,
+    gstFrom: d.gstFrom ? str(d.gstFrom) : null,
+    state: str(d.state),
+    postcode: str(d.postcode),
+  };
+}
+
 /** "Look up ABN" button: checks the ABR and hands back the name and GST status. */
 export function AbnLookup({ abn, onResult }: { abn: string; onResult: (r: AbnResult) => void }) {
   const [busy, setBusy] = useState(false);
@@ -29,7 +53,7 @@ export function AbnLookup({ abn, onResult }: { abn: string; onResult: (r: AbnRes
     if (!isValidAbn(abn)) return setError('That ABN is not valid. Check the 11 digits.');
     setBusy(true);
     try {
-      const r = await callFunction<AbnResult>('abn-lookup', { abn: cleanAbn(abn) });
+      const r = toResult(await callFunction<unknown>('abn-lookup', { abn: cleanAbn(abn) }), cleanAbn(abn));
       setFound(r);
       onResult(r);
     } catch (e) {
@@ -51,7 +75,9 @@ export function AbnLookup({ abn, onResult }: { abn: string; onResult: (r: AbnRes
           {found.entityName}
           {found.businessNames.length ? ` (trading as ${found.businessNames.join(', ')})` : ''}
           {'\n'}
-          {found.gstRegistered ? `Registered for GST from ${found.gstFrom?.slice(0, 10).split('-').reverse().join('/')}` : 'NOT registered for GST'}
+          {found.gstRegistered
+            ? `Registered for GST${found.gstFrom ? ` from ${found.gstFrom.slice(0, 10).split('-').reverse().join('/')}` : ''}`
+            : 'NOT registered for GST'}
           {found.state ? ` · ${found.state} ${found.postcode}` : ''}
           {'\n'}Name and GST filled in below. Tap Save to keep them.
         </Text>
