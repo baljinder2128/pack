@@ -13,5 +13,7 @@ jobs:
     steps:
       - name: Run the licence check
         run: |
-          curl -s -w "\nHTTP %{http_code}\n" -X POST -H "Content-Type: application/json" -d '{}' \
+          # The publishable key is public (it's in the app); the gateway wants one on every call.
+          curl -s -w "\nHTTP %{http_code}\n" -X POST -H "Content-Type: application/json" \
+            -H "apikey: sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP" -d '{}' \
             https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/licence-alerts
