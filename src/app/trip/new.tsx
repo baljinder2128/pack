@@ -24,7 +24,6 @@ export default function NewTrip() {
     pickup: '',
     dropoff: '',
     start_odometer: '',
-    amount: '',
     notes: '',
   });
   const [busy, setBusy] = useState(false);
@@ -54,7 +53,8 @@ export default function NewTrip() {
         pickup: form.pickup.trim(),
         dropoff: form.dropoff.trim(),
         start_odometer: numOrNull(form.start_odometer),
-        amount: isOffice ? numOrNull(form.amount) ?? 0 : 0,
+        // Drivers are paid by the hour, so a planned load carries no trip pay.
+        amount: 0,
         notes: form.notes.trim() || null,
       })
       .select('id')
@@ -77,7 +77,6 @@ export default function NewTrip() {
       <Field label="Pickup" value={form.pickup} onChangeText={set('pickup')} />
       <Field label="Drop-off" value={form.dropoff} onChangeText={set('dropoff')} />
       <Field label="Start odometer (km)" value={form.start_odometer} onChangeText={set('start_odometer')} keyboardType="number-pad" />
-      {isOffice && <Field label="Trip pay ($, inc GST)" value={form.amount} onChangeText={set('amount')} keyboardType="decimal-pad" />}
       <Field label="Notes" value={form.notes} onChangeText={set('notes')} multiline />
       <ErrorText>{error}</ErrorText>
       <Button title="Save trip" onPress={save} busy={busy} />
