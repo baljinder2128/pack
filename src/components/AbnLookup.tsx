@@ -24,8 +24,10 @@ function toResult(data: unknown, abn: string): AbnResult {
   const d = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
   const entityName = str(d.entityName).trim();
   if (!entityName) {
+    // Show what came back so a wrong or sample function is easy to spot.
+    const reply = JSON.stringify(data ?? null).slice(0, 160);
     throw new Error(
-      'The ABN lookup did not return a business name. Check the abn-lookup function in Supabase has the SBT code and the ABR_GUID secret.',
+      `The ABN lookup did not return a business name. The abn-lookup function in Supabase may still have the sample code. It replied: ${reply}`,
     );
   }
   return {
