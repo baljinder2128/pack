@@ -101,6 +101,7 @@ export type Rcti = {
   gst: number;
   total: number;
   issued_at: string;
+  pdf_path: string | null;
 };
 
 export type LiveDriver = {

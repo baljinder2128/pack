@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
+import { router } from 'expo-router';
 import { Platform, Text } from 'react-native';
 
 import { DriverPicker } from '@/components/DriverPicker';
@@ -95,8 +96,16 @@ export default function RctiScreen() {
         .single();
       if (error) throw new Error(error.message);
       const rcti = data as Rcti;
+      // Keep the PDF exactly as issued, for the archive.
+      const pdf = await rctiPdf({ number: rcti.number, issuedAt: rcti.issued_at, weekStart: start, weekEnd: weekEnd(start), ...w });
+      const path = `${w.driver.id}/RCTI-${rcti.number}.pdf`;
+      const { error: uploadError } = await supabase.storage
+        .from('rcti-pdfs')
+        .upload(path, pdf, { contentType: 'application/pdf', upsert: true });
+      if (uploadError) throw new Error(`RCTI #${rcti.number} is issued, but saving the PDF failed: ${uploadError.message}`);
+      await supabase.from('rctis').update({ pdf_path: path }).eq('id', rcti.id);
       week.reload();
-      await emailRcti(rcti);
+      await emailRcti(rcti, pdf);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -104,12 +113,9 @@ export default function RctiScreen() {
     }
   }
 
-  async function emailRcti(rcti: Rcti) {
-    const w = week.data;
-    if (!w) return;
+  async function emailRcti(rcti: Rcti, pdf: Uint8Array) {
     setMsg('Emailing the RCTI to the office…');
     try {
-      const pdf = await rctiPdf({ number: rcti.number, issuedAt: rcti.issued_at, weekStart: start, weekEnd: weekEnd(start), ...w });
       await callFunction('send-rcti', { rcti_id: rcti.id, pdf_base64: toBase64(pdf) });
       setMsg(`RCTI #${rcti.number} emailed to sbtruckin@outlook.com as a PDF.`);
     } catch (e) {
@@ -123,7 +129,16 @@ export default function RctiScreen() {
     setBusy(true);
     setActionError(null);
     try {
-      await emailRcti(week.data.issued);
+      const w = week.data;
+      const rcti = w.issued!;
+      // Email the archived copy when there is one, so it matches what was issued.
+      let pdf: Uint8Array | null = null;
+      if (rcti.pdf_path) {
+        const { data: blob } = await supabase.storage.from('rcti-pdfs').download(rcti.pdf_path);
+        if (blob) pdf = new Uint8Array(await blob.arrayBuffer());
+      }
+      pdf ??= await rctiPdf({ number: rcti.number, issuedAt: rcti.issued_at, weekStart: start, weekEnd: weekEnd(start), ...w });
+      await emailRcti(rcti, pdf);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -157,6 +172,7 @@ export default function RctiScreen() {
 
   return (
     <Screen>
+      <Button title="RCTI archive: all issued RCTIs" variant="secondary" onPress={() => router.push('/rcti-archive')} />
       <WeekNav start={start} onChange={setStart} />
       {isOffice && drivers.data && (
         <DriverPicker drivers={drivers.data} value={selectedId} onChange={setDriverId} />

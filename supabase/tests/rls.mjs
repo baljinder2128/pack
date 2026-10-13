@@ -64,4 +64,10 @@ check('trips cannot be deleted, even by office', (await db.query(`select 1 from 
 await as(O, `update inspections set archived_at=now(), archived_by='${O}'`);
 check('office archives an inspection', (await db.query(`select count(*)::int n from inspections where archived_at is not null`)).rows[0].n === 1);
 check('inspections cannot be deleted', (await as(O, `delete from inspections returning *`)).length === 0);
+check('office stores an RCTI PDF', !String(await as(O, `insert into storage.objects (bucket_id,name) values ('rcti-pdfs','${D}/RCTI-1.pdf')`)).startsWith('ERR'));
+check('driver cannot store RCTI PDFs', String(await as(D, `insert into storage.objects (bucket_id,name) values ('rcti-pdfs','${D}/RCTI-2.pdf')`)).startsWith('ERR'));
+check('driver reads own RCTI PDF', (await as(D, `select * from storage.objects where bucket_id='rcti-pdfs'`)).length === 1);
+check('other driver cannot read it', (await as(D2, `select * from storage.objects where bucket_id='rcti-pdfs'`)).length === 0);
+await q(fs.readFileSync(new URL('../migrations/0005_rcti_archive.sql', import.meta.url), 'utf8'));
+check('0005 can be run twice', true);
 if (failed) process.exit(1);
