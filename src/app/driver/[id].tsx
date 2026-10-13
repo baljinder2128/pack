@@ -146,6 +146,32 @@ export default function DriverScreen() {
     );
   }
 
+  function deleteForever() {
+    alert(
+      `Delete ${driver?.full_name} permanently?`,
+      'This deletes their login and all their trips, hours, pre-trip inspections, runsheets and photos. It cannot be undone. People with RCTIs or payslips cannot be deleted, because pay records must be kept for 5 years.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete permanently',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              await callFunction('manage-driver', { action: 'delete', user_id: id });
+              router.back();
+            } catch (e) {
+              const m = e instanceof Error ? e.message : String(e);
+              setError(/Unknown action/i.test(m) ? 'Update the manage-driver function in Supabase first, then try again.' : m);
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   if (loading && !driver) return <Loading />;
   if (!driver) return <ErrorText>Not found</ErrorText>;
   const isSelf = driver.id === session?.user.id;
@@ -276,6 +302,7 @@ export default function DriverScreen() {
             onPress={() => run(() => callFunction('manage-driver', { action: 'restore', user_id: id }), 'Login restored.')}
           />
         ))}
+      {!isSelf && <Button title="Delete permanently" variant="danger" onPress={deleteForever} busy={busy} />}
       <Button title="Back to drivers" variant="secondary" onPress={() => router.back()} />
     </Screen>
   );

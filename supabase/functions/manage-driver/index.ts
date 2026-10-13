@@ -8,6 +8,8 @@
 //   { action: 'remove', user_id }          -> blocks the login, keeps their history
 //   { action: 'restore', user_id }         -> lets a removed driver sign in again
 //   { action: 'reset_password', user_id, password }
+//   { action: 'delete', user_id }          -> deletes the login and all their records for good,
+//                                             unless they have RCTIs or payslips (kept for the ATO)
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -98,6 +100,71 @@ Deno.serve(async (req) => {
       const password = String(body.password ?? '');
       if (password.length < 8) return json({ error: 'Password must be at least 8 characters' }, 400);
       const { error } = await admin.auth.admin.updateUserById(String(body.user_id ?? ''), { password });
+      if (error) return json({ error: error.message }, 400);
+      return json({ ok: true });
+    }
+
+    case 'delete': {
+      const userId = String(body.user_id ?? '');
+      if (!userId) return json({ error: 'user_id is required' }, 400);
+      if (userId === caller.user?.id) return json({ error: "You can't delete your own login" }, 400);
+
+      // Pay records must be kept for 5 years (ATO), so they block a permanent delete.
+      const count = async (table: string, column: string) => {
+        const { count: n } = await admin.from(table).select('id', { count: 'exact', head: true }).eq(column, userId);
+        return n ?? 0;
+      };
+      const rctis = await count('rctis', 'driver_id');
+      const payslips = await count('payslips', 'employee_id');
+      if (rctis || payslips) {
+        const what = [rctis && `${rctis} RCTI${rctis === 1 ? '' : 's'}`, payslips && `${payslips} payslip${payslips === 1 ? '' : 's'}`]
+          .filter(Boolean)
+          .join(' and ');
+        return json(
+          {
+            error: `This person has ${what}. Pay records must be kept for 5 years, so they can't be deleted. Keep them removed instead${rctis && !payslips ? ', or delete their RCTIs in the Pay archive first' : ''}.`,
+          },
+          400,
+        );
+      }
+
+      // Photos are stored under <user id>/<record id>/<n>.jpg.
+      for (const bucket of ['inspection-photos', 'runsheet-photos']) {
+        const { data: folders } = await admin.storage.from(bucket).list(userId, { limit: 1000 });
+        for (const folder of folders ?? []) {
+          const { data: files } = await admin.storage.from(bucket).list(`${userId}/${folder.name}`, { limit: 1000 });
+          const paths = (files ?? []).map((f) => `${userId}/${folder.name}/${f.name}`);
+          if (paths.length) await admin.storage.from(bucket).remove(paths);
+        }
+      }
+
+      // A table that isn't set up yet (migration not run) is fine to skip.
+      const missing = (e: { message: string } | null) => !e || /does not exist|schema cache/i.test(e.message);
+      const steps: [string, string, 'delete' | 'unlink'][] = [
+        ['trips', 'created_by', 'unlink'],
+        ['trips', 'archived_by', 'unlink'],
+        ['inspections', 'archived_by', 'unlink'],
+        ['rctis', 'issued_by', 'unlink'],
+        ['payslips', 'issued_by', 'unlink'],
+        ['employee_tfns', 'updated_by', 'unlink'],
+        ['runsheets', 'reviewed_by', 'unlink'],
+        ['runsheets', 'driver_id', 'delete'],
+        ['inspections', 'driver_id', 'delete'],
+        ['shifts', 'driver_id', 'delete'],
+        ['trips', 'driver_id', 'delete'],
+        ['driver_locations', 'driver_id', 'delete'],
+        ['employee_tfns', 'employee_id', 'delete'],
+      ];
+      for (const [table, column, how] of steps) {
+        const { error } =
+          how === 'delete'
+            ? await admin.from(table).delete().eq(column, userId)
+            : await admin.from(table).update({ [column]: null }).eq(column, userId);
+        if (!missing(error)) return json({ error: `Could not clear ${table}: ${error!.message}` }, 500);
+      }
+
+      // Deleting the login also deletes their profile.
+      const { error } = await admin.auth.admin.deleteUser(userId);
       if (error) return json({ error: error.message }, 400);
       return json({ ok: true });
     }

@@ -21,6 +21,7 @@ function tempPassword(): string {
 export default function DriversScreen() {
   const { data, loading, error, reload } = useFocusQuery(() => listDrivers({ includeRemoved: true }), []);
   const [adding, setAdding] = useState(false);
+  const [showRemoved, setShowRemoved] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -161,8 +162,14 @@ export default function DriversScreen() {
           ))}
         </View>
       )}
-      {removed.length > 0 && <Title>Removed</Title>}
-      {removed.map((d) => (
+      {removed.length > 0 && (
+        <Button
+          title={showRemoved ? 'Hide removed people' : `Show removed people (${removed.length})`}
+          variant="secondary"
+          onPress={() => setShowRemoved((v) => !v)}
+        />
+      )}
+      {showRemoved && removed.map((d) => (
         <Card key={d.id} onPress={() => router.push(`/driver/${d.id}`)}>
           <Row>
             <Title>{d.full_name || 'Unnamed'}</Title>

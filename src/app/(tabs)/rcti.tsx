@@ -39,7 +39,11 @@ export default function RctiScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const drivers = useFocusQuery(async () => (isOffice ? listDrivers({ includeRemoved: true }) : []), [isOffice]);
+  // Only drivers who are currently working; past pay is in the archive.
+  const drivers = useFocusQuery(
+    async () => (isOffice ? (await listDrivers()).filter((d) => d.role === 'driver') : []),
+    [isOffice],
+  );
   const selectedId = driverId ?? (isOffice ? null : profile?.id ?? null);
 
   const week = useFocusQuery(async () => {

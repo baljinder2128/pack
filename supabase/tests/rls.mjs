@@ -113,4 +113,15 @@ check('office reads runsheet photos', (await as(O, `select * from storage.object
 check('other driver cannot read runsheet photos', (await as(D2, `select * from storage.objects where bucket_id='runsheet-photos'`)).length===0);
 await q(fs.readFileSync(new URL('../migrations/0008_runsheets.sql', import.meta.url), 'utf8'));
 check('0008 can be run twice', true);
+// Permanent delete (manage-driver 'delete'): the same clean-up steps, as the service role.
+await q(`insert into trips (driver_id,pickup,dropoff,created_by) values ('${D2}','P','Q','${D2}');
+insert into shifts (driver_id,start_at,end_at) values ('${D2}','2026-10-13T06:00Z','2026-10-13T10:00Z');
+insert into inspections (driver_id) values ('${D2}');
+insert into runsheets (driver_id,run_date) values ('${D2}','2026-10-13');
+update trips set archived_by='${D2}' where driver_id='${D}';`);
+for (const [t, c, how] of [['trips','created_by','unlink'],['trips','archived_by','unlink'],['inspections','archived_by','unlink'],['rctis','issued_by','unlink'],['payslips','issued_by','unlink'],['employee_tfns','updated_by','unlink'],['runsheets','reviewed_by','unlink'],['runsheets','driver_id','delete'],['inspections','driver_id','delete'],['shifts','driver_id','delete'],['trips','driver_id','delete'],['driver_locations','driver_id','delete'],['employee_tfns','employee_id','delete']])
+  await q(how === 'delete' ? `delete from ${t} where ${c}='${D2}'` : `update ${t} set ${c}=null where ${c}='${D2}'`);
+let delErr = null; try { await q(`delete from auth.users where id='${D2}'`); } catch (e) { delErr = e.message; }
+check('permanent delete clears every link to the person' + (delErr ? ` (${delErr})` : ''), !delErr && (await db.query(`select 1 from profiles where id='${D2}'`)).rows.length === 0);
+check('other drivers keep their records', (await db.query(`select 1 from trips where driver_id='${D}'`)).rows.length > 0);
 if (failed) process.exit(1);
