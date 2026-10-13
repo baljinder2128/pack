@@ -54,6 +54,7 @@ export default function DriverScreen() {
     const d = unwrap(await supabase.from('profiles').select('*').eq('id', id).single()) as Profile;
     // Kept in its own office-only table. Missing before migration 0006 is run.
     const { data: tfnRow } = await supabase.from('employee_tfns').select('tfn').eq('employee_id', id).maybeSingle();
+    setNewEmail(d.email ?? '');
     setForm({
       full_name: d.full_name,
       phone: d.phone ?? '',
@@ -104,6 +105,12 @@ export default function DriverScreen() {
         if (!form[key].trim()) continue;
         dates[key] = parseDateInput(form[key]);
         if (!dates[key]) throw new Error(`${label}: enter the date like 25/12/2027.`);
+      }
+      const email = newEmail.trim().toLowerCase();
+      if (email && email !== (driver?.email ?? '').toLowerCase()) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid email address.');
+        // The email is their sign-in, so it changes on the server (manage-driver).
+        await callFunction('manage-driver', { action: 'change_email', user_id: id, email });
       }
       const { tfn, ...details } = form;
       if (payType === 'tfn' && tfn.trim() && !isValidTfn(tfn)) throw new Error('That TFN is not valid. Check the 9 digits on their TFN declaration.');
@@ -202,6 +209,13 @@ export default function DriverScreen() {
         />
       )}
       <Field label="Full name" value={form.full_name} onChangeText={set('full_name')} />
+      <Field
+        label="Email (they sign in with this; payslips and RCTIs go here)"
+        value={newEmail}
+        onChangeText={setNewEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
       <Field label="Phone" value={form.phone} onChangeText={set('phone')} keyboardType="phone-pad" />
       <Title>How they are paid</Title>
       <Segmented
@@ -275,29 +289,6 @@ export default function DriverScreen() {
       {payType === 'abn' && <Toggle label="Registered for GST" value={gst} onChange={setGst} />}
       <Button title="Save" onPress={save} busy={busy} />
 
-      <Card>
-        <Title>Change email</Title>
-        <Muted>This is the email they sign in with. Payslips and RCTIs go to it too.</Muted>
-        <Field
-          label="New email"
-          value={newEmail}
-          onChangeText={setNewEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder={driver.email ?? ''}
-        />
-        <Button
-          title="Change email"
-          variant="secondary"
-          busy={busy}
-          onPress={() =>
-            run(async () => {
-              await callFunction('manage-driver', { action: 'change_email', user_id: id, email: newEmail });
-              setNewEmail('');
-            }, `Email changed. They now sign in with ${newEmail.trim().toLowerCase()} and the same password.`)
-          }
-        />
-      </Card>
 
       <Card>
         <Title>Reset password</Title>
