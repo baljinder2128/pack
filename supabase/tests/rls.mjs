@@ -190,4 +190,10 @@ check('office removes a truck', (await as(O, `update vehicles set active=false r
 check('trip saves a Visy trailer number', !String(await as(D, `insert into trips (driver_id,pickup,dropoff,visy_trailer) values ('${D}','A','B','V123')`)).startsWith('ERR'));
 await q(fs.readFileSync(new URL('../migrations/0014_fleet.sql', import.meta.url), 'utf8'));
 check('0014 can be run twice', true);
+// 0015: fleet numbers.
+await q(fs.readFileSync(new URL('../migrations/0015_fleet_numbers.sql', import.meta.url), 'utf8'));
+check('office sets a trailer fleet number', !String(await as(O, `insert into vehicles (kind,rego,fleet_number) values ('trailer','TR55','12') on conflict (kind,rego) do update set fleet_number=excluded.fleet_number`)).startsWith('ERR'));
+check('driver reads fleet numbers', (await as(D, `select fleet_number from vehicles where rego='TR55'`))[0]?.fleet_number==='12');
+await q(fs.readFileSync(new URL('../migrations/0015_fleet_numbers.sql', import.meta.url), 'utf8'));
+check('0015 can be run twice', true);
 if (failed) process.exit(1);

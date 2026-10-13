@@ -5,12 +5,13 @@ import { Button, Card, Empty, ErrorText, Field, Loading, Muted, Row, Screen, Seg
 import { supabase } from '@/lib/supabase';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
 
-type Vehicle = { id: string; kind: 'truck' | 'trailer'; rego: string; description: string | null; active: boolean };
+type Vehicle = { id: string; kind: 'truck' | 'trailer'; rego: string; fleet_number?: string | null; description: string | null; active: boolean };
 
 /** Office: the trucks and trailers drivers pick from when they enter a rego. */
 export default function FleetScreen() {
   const [kind, setKind] = useState<'truck' | 'trailer'>('truck');
   const [rego, setRego] = useState('');
+  const [fleet, setFleet] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,10 +29,14 @@ export default function FleetScreen() {
     // Re-adding a removed rego brings it back.
     const { error: e } = await supabase
       .from('vehicles')
-      .upsert({ kind, rego: r, description: description.trim() || null, active: true }, { onConflict: 'kind,rego' });
+      .upsert(
+        { kind, rego: r, description: description.trim() || null, active: true, ...(fleet.trim() ? { fleet_number: fleet.trim().toUpperCase() } : {}) },
+        { onConflict: 'kind,rego' },
+      );
     setBusy(false);
-    if (e) return setError(e.message);
+    if (e) return setError(/fleet_number/i.test(e.message) ? `${e.message}. Run the 0015 SQL in Supabase first.` : e.message);
     setRego('');
+    setFleet('');
     setDescription('');
     reload();
   }
@@ -60,12 +65,13 @@ export default function FleetScreen() {
       />
       <Card>
         <Title>Add a {noun}</Title>
+        <Field label="Fleet number" value={fleet} onChangeText={setFleet} autoCapitalize="characters" placeholder="e.g. 12" />
         <Field label="Rego" value={rego} onChangeText={setRego} autoCapitalize="characters" placeholder="e.g. XQ12AB" />
         <Field label="Description (optional)" value={description} onChangeText={setDescription} placeholder={kind === 'truck' ? 'e.g. Kenworth T610' : 'e.g. 45ft flat top'} />
         <ErrorText>{error}</ErrorText>
         <Button title={`Add ${noun}`} onPress={add} busy={busy} />
       </Card>
-      <Muted>Drivers pick from this list when they enter a {noun} rego on trips, pre-trips and runsheets.</Muted>
+      <Muted>To change a fleet number, add the same rego again with the new number. Drivers pick from this list when they enter a {noun} rego on trips, pre-trips and runsheets.</Muted>
       <ErrorText>
         {loadError && /vehicles|schema cache/i.test(loadError) ? `${loadError}. Run the 0014 SQL in Supabase first.` : loadError}
       </ErrorText>
@@ -75,7 +81,7 @@ export default function FleetScreen() {
         active.map((v) => (
           <Card key={v.id}>
             <Row>
-              <Title>{v.rego}</Title>
+              <Title>{v.fleet_number ? `Fleet ${v.fleet_number} · ${v.rego}` : v.rego}</Title>
               <Text style={{ marginLeft: 'auto', color: colors.danger, fontWeight: '700' }} onPress={() => setActive(v, false)}>
                 Remove
               </Text>
