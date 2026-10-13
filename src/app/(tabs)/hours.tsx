@@ -6,7 +6,7 @@ import { WeekNav } from '@/components/WeekNav';
 import { Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDate, formatTime } from '@/lib/format';
-import { round2, shiftHours, toISODate, weekEnd, weekStart } from '@/lib/pay';
+import { addDays, round2, shiftHours, toISODate, weekStart } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import type { Shift } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
@@ -22,7 +22,7 @@ export default function HoursScreen() {
         .from('shifts')
         .select('*, driver:profiles!shifts_driver_id_fkey(full_name)')
         .gte('shift_date', start)
-        .lte('shift_date', weekEnd(start))
+        .lte('shift_date', addDays(start, 6)) // include Sunday so nothing logged is hidden
         .order('start_at'),
     ) as Shift[];
   }, [start]);

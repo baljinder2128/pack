@@ -2,11 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRcti, shiftHours, shiftTimes, weekStart, weekEnd, isISODate } from './pay.ts';
 
-test('weeks run Monday to Sunday', () => {
+test('weeks run Monday to Saturday', () => {
   assert.equal(weekStart('2026-10-12'), '2026-10-12'); // Monday
   assert.equal(weekStart('2026-10-18'), '2026-10-12'); // Sunday
   assert.equal(weekStart('2026-10-19'), '2026-10-19');
-  assert.equal(weekEnd('2026-10-12'), '2026-10-18');
+  assert.equal(weekEnd('2026-10-12'), '2026-10-17');
 });
 
 test('validates dates', () => {

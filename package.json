@@ -16,6 +16,7 @@
     "expo-sharing": "~57.0.22",
     "expo-status-bar": "~57.0.1",
     "expo-task-manager": "~57.0.21",
+    "pdf-lib": "^1.17.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",

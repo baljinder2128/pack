@@ -7,10 +7,11 @@ import { DriverPicker } from '@/components/DriverPicker';
 import { WeekNav } from '@/components/WeekNav';
 import { Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { listDrivers } from '@/lib/drivers';
+import { callFunction, listDrivers } from '@/lib/drivers';
 import { formatDate, formatDateTime } from '@/lib/format';
-import { buildRcti, money, toISODate, weekEnd, weekStart } from '@/lib/pay';
+import { addDays, buildRcti, money, round2, shiftHours, toISODate, weekEnd, weekStart } from '@/lib/pay';
 import { rctiHtml } from '@/lib/rctiHtml';
+import { rctiPdf, toBase64 } from '@/lib/rctiPdf';
 import { supabase } from '@/lib/supabase';
 import type { Company, Profile, Rcti, Shift, Trip } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
@@ -31,6 +32,7 @@ export default function RctiScreen() {
   const [driverId, setDriverId] = useState<string | null>(isOffice ? null : profile?.id ?? null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
 
   const drivers = useFocusQuery(async () => (isOffice ? listDrivers({ includeRemoved: true }) : []), [isOffice]);
   const selectedId = driverId ?? (isOffice ? null : profile?.id ?? null);
@@ -38,21 +40,35 @@ export default function RctiScreen() {
   const week = useFocusQuery(async () => {
     if (!selectedId) return null;
     const end = weekEnd(start);
+    const sunday = addDays(start, 6); // fetched only to warn about Sunday work
     const [driverRes, tripsRes, shiftsRes, companyRes, rctiRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', selectedId).single(),
-      supabase.from('trips').select('*').eq('driver_id', selectedId).gte('trip_date', start).lte('trip_date', end),
-      supabase.from('shifts').select('*').eq('driver_id', selectedId).gte('shift_date', start).lte('shift_date', end),
+      supabase.from('trips').select('*').eq('driver_id', selectedId).gte('trip_date', start).lte('trip_date', sunday),
+      supabase.from('shifts').select('*').eq('driver_id', selectedId).gte('shift_date', start).lte('shift_date', sunday),
       supabase.from('company').select('*').eq('id', 1).single(),
       supabase.from('rctis').select('*').eq('driver_id', selectedId).eq('week_start', start).maybeSingle(),
     ]);
     const driver = unwrap(driverRes) as Profile;
-    const trips = unwrap(tripsRes) as Trip[];
-    const shifts = unwrap(shiftsRes) as Shift[];
+    const allTrips = unwrap(tripsRes) as Trip[];
+    const allShifts = unwrap(shiftsRes) as Shift[];
+    const trips = allTrips.filter((t) => t.trip_date <= end);
+    const shifts = allShifts.filter((x) => x.shift_date <= end);
+    const sundayEntries = allTrips.length - trips.length + allShifts.length - shifts.length;
+    // Monday to Saturday: hours and trips logged each day, so gaps stand out.
+    const days = [0, 1, 2, 3, 4, 5].map((i) => {
+      const date = addDays(start, i);
+      const dayShifts = shifts.filter((x) => x.shift_date === date);
+      return {
+        date,
+        hours: round2(dayShifts.reduce((h, x) => h + shiftHours(x.start_at, x.end_at, x.break_minutes), 0)),
+        trips: trips.filter((t) => t.trip_date === date).length,
+      };
+    });
     const company = unwrap(companyRes) as Company;
     const issued = (rctiRes.data as Rcti | null) ?? null;
     const totals = buildRcti(trips, shifts, Number(driver.hourly_rate), driver.gst_registered);
     const openTrips = trips.filter((t) => t.status !== 'completed').length;
-    return { driver, trips, company, issued, totals, openTrips };
+    return { driver, trips, company, issued, totals, openTrips, days, sundayEntries };
   }, [selectedId, start]);
 
   async function issue() {
@@ -79,11 +95,35 @@ export default function RctiScreen() {
         .single();
       if (error) throw new Error(error.message);
       const rcti = data as Rcti;
-      await sharePdf(
-        rctiHtml({ number: rcti.number, issuedAt: rcti.issued_at, weekStart: start, weekEnd: weekEnd(start), ...w }),
-        `RCTI ${rcti.number}`,
-      );
       week.reload();
+      await emailRcti(rcti);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function emailRcti(rcti: Rcti) {
+    const w = week.data;
+    if (!w) return;
+    setMsg('Emailing the RCTI to the office…');
+    try {
+      const pdf = await rctiPdf({ number: rcti.number, issuedAt: rcti.issued_at, weekStart: start, weekEnd: weekEnd(start), ...w });
+      await callFunction('send-rcti', { rcti_id: rcti.id, pdf_base64: toBase64(pdf) });
+      setMsg(`RCTI #${rcti.number} emailed to sbtruckin@outlook.com as a PDF.`);
+    } catch (e) {
+      setMsg(null);
+      throw new Error(`RCTI #${rcti.number} is issued, but the email failed: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  async function emailAgain() {
+    if (!week.data?.issued) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await emailRcti(week.data.issued);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -144,6 +184,26 @@ export default function RctiScreen() {
               <Muted>Not issued yet</Muted>
             )}
           </Card>
+          <Card>
+            <Title>Each day</Title>
+            {w.days.map((d) => (
+              <Row key={d.date}>
+                <Text style={{ flex: 1 }}>{formatDate(d.date)}</Text>
+                <Text style={{ color: d.hours || d.trips ? colors.text : colors.warning, fontWeight: '600' }}>
+                  {d.hours || d.trips
+                    ? `${d.hours} hrs${d.trips ? ` · ${d.trips} trip${d.trips === 1 ? '' : 's'}` : ''}`
+                    : 'Nothing logged'}
+                </Text>
+              </Row>
+            ))}
+            <Muted>Check every day is right before issuing.</Muted>
+          </Card>
+          {w.sundayEntries > 0 && (
+            <Text style={{ color: colors.warning }}>
+              {w.sundayEntries} entr{w.sundayEntries === 1 ? 'y is' : 'ies are'} on Sunday, which is outside the Monday to
+              Saturday pay week, so {w.sundayEntries === 1 ? 'it is' : 'they are'} not on this RCTI.
+            </Text>
+          )}
           {w.openTrips > 0 && (
             <Text style={{ color: colors.warning }}>
               {w.openTrips} trip(s) this week are not completed and are left off the RCTI.
@@ -165,9 +225,13 @@ export default function RctiScreen() {
             </Card>
           ))}
           {w.totals.lines.length === 0 && <Empty>No paid trips or hours this week.</Empty>}
+          {msg && <Text style={{ color: colors.success }}>{msg}</Text>}
           <ErrorText>{actionError ?? week.error}</ErrorText>
           {isOffice ? (
-            <Button title={w.issued ? 'Re-issue RCTI & share PDF' : 'Issue RCTI & share PDF'} onPress={issue} busy={busy} />
+            <>
+              <Button title={w.issued ? 'Re-issue RCTI & email PDF' : 'Everything OK: issue RCTI & email PDF'} onPress={issue} busy={busy} />
+              {w.issued && <Button title="Email this RCTI again" variant="secondary" onPress={emailAgain} busy={busy} />}
+            </>
           ) : (
             w.issued && <Button title="Download my RCTI (PDF)" onPress={download} busy={busy} />
           )}

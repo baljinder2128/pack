@@ -46,15 +46,16 @@ export function addDays(s: string, days: number): string {
   return toISODate(d);
 }
 
-/** Pay weeks run Monday to Sunday. Returns the Monday on or before `s`. */
+/** Pay weeks run Monday to Saturday. Returns the Monday on or before `s`. */
 export function weekStart(s: string): string {
   const d = parseISODate(s);
   const offset = (d.getDay() + 6) % 7; // Mon=0 … Sun=6
   return addDays(s, -offset);
 }
 
+/** The Saturday that ends the pay week starting `start`. */
 export function weekEnd(start: string): string {
-  return addDays(start, 6);
+  return addDays(start, 5);
 }
 
 /** Parses "7:30", "0730" or "19:05" into minutes after midnight. */

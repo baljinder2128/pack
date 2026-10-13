@@ -4,7 +4,7 @@ import { formatDate } from '@/lib/format';
 import { addDays, weekEnd } from '@/lib/pay';
 import { colors } from './ui';
 
-/** "‹ Mon 12 Oct – Sun 18 Oct ›" selector for Monday-to-Sunday pay weeks. */
+/** "‹ Mon 12 Oct – Sat 17 Oct ›" selector for Monday-to-Saturday pay weeks. */
 export function WeekNav({ start, onChange }: { start: string; onChange: (start: string) => void }) {
   const arrow = (label: string, days: number) => (
     <Pressable onPress={() => onChange(addDays(start, days))} hitSlop={12} style={{ padding: 8 }}>
