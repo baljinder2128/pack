@@ -1,5 +1,5 @@
 import { colors } from '@/components/ui';
-import { addDays, toISODate } from './pay';
+import { addDays, parseISODate, toISODate } from './pay';
 
 /** Licence expiry status for badges on the drivers list. */
 export function licenceStatus(expiry: string | null): { label: string; color: string } | null {
@@ -30,3 +30,10 @@ export const STATES = [
   { value: 'ACT', label: 'ACT – Australian Capital Territory' },
   { value: 'NT', label: 'NT – Northern Territory' },
 ];
+
+/** Days until the licence expires (negative once expired), or null with no expiry on file. */
+export function daysToExpiry(expiry: string | null): number | null {
+  if (!expiry) return null;
+  const today = parseISODate(toISODate(new Date())).getTime();
+  return Math.round((parseISODate(expiry).getTime() - today) / 86400000);
+}

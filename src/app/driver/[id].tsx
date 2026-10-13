@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
 import { AbnLookup } from '@/components/AbnLookup';
+import { LicencePhotos } from '@/components/LicencePhotos';
 import { formatAbn } from '@/lib/abn';
 import { Button, Card, ErrorText, Field, Loading, Muted, Screen, Segmented, Select, Title, Toggle } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -254,6 +255,7 @@ export default function DriverScreen() {
       <Select label="Licence class" value={form.licence_class} options={LICENCE_CLASSES} onChange={set('licence_class')} />
       <Select label="State" value={form.licence_state} options={STATES} onChange={set('licence_state')} />
       <Field label="Licence expiry (DD/MM/YYYY)" value={form.licence_expiry} onChangeText={set('licence_expiry')} placeholder="e.g. 25/12/2027" />
+      <LicencePhotos driverId={id} />
       {payType === 'abn' && (
         <>
           <Title>Business (for RCTI)</Title>

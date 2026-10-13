@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Call each function
         run: |
-          for f in manage-driver send-inspection send-rcti send-payslip abn-lookup; do
+          for f in manage-driver send-inspection send-rcti send-payslip abn-lookup licence-alerts; do
             echo "=== $f"
             curl -s -o /tmp/opt -w "OPTIONS %{http_code} allow-origin=%header{access-control-allow-origin}\n" -X OPTIONS \
               -H "Origin: https://baljinder2128.github.io" -H "Access-Control-Request-Method: POST" \

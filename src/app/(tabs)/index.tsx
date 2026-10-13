@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { DutyCard } from '@/components/DutyCard';
+import { LicenceAlert } from '@/components/LicenceAlert';
 import { RunsheetList } from '@/components/RunsheetList';
 import { SignalWarning } from '@/components/SignalWarning';
 import { Badge, Button, Card, Empty, ErrorText, Hero, Loading, Muted, Row, Screen, Segmented, Title } from '@/components/ui';
@@ -38,7 +39,10 @@ export default function TripsScreen() {
           <Button title="Live map: where are my drivers?" variant="secondary" onPress={() => router.push('/live-map')} />
         </>
       ) : (
-        <DutyCard />
+        <>
+          <LicenceAlert />
+          <DutyCard />
+        </>
       )}
       <Button title={isOffice ? '+ Plan a load for a driver' : '+ New trip'} onPress={() => router.push('/trip/new')} />
       {!isOffice && filter === 'active' && !!data?.filter((t) => t.status === 'planned').length && (

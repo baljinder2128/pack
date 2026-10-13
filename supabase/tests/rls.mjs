@@ -124,4 +124,18 @@ for (const [t, c, how] of [['trips','created_by','unlink'],['trips','archived_by
 let delErr = null; try { await q(`delete from auth.users where id='${D2}'`); } catch (e) { delErr = e.message; }
 check('permanent delete clears every link to the person' + (delErr ? ` (${delErr})` : ''), !delErr && (await db.query(`select 1 from profiles where id='${D2}'`)).rows.length === 0);
 check('other drivers keep their records', (await db.query(`select 1 from trips where driver_id='${D}'`)).rows.length > 0);
+// Re-running 0006 above reset protect_profile_fields, so apply 0009 again first.
+await q(fs.readFileSync(new URL('../migrations/0009_licence_renewals.sql', import.meta.url), 'utf8'));
+await as(O, `update profiles set licence_expiry='2027-01-01' where id='${D}'`);
+await as(D, `update profiles set licence_expiry='2030-01-01', phone='0400' where id='${D}'`);
+const lic = (await db.query(`select licence_expiry::text, phone from profiles where id='${D}'`)).rows[0];
+check('driver cannot change own licence expiry', lic.licence_expiry === '2027-01-01' && lic.phone === '0400');
+check('driver sends own licence renewal', !String(await as(D, `insert into licence_renewals (driver_id,new_expiry) values ('${D}','2030-01-01')`)).startsWith('ERR'));
+check('driver cannot send renewal for someone else', String(await as(D, `insert into licence_renewals (driver_id,new_expiry) values ('${O}','2030-01-01')`)).startsWith('ERR'));
+check('office reads licence renewals', (await as(O, `select * from licence_renewals`)).length===1);
+check('licence renewals cannot be edited by drivers', (await as(D, `update licence_renewals set new_expiry='2040-01-01' returning *`)).length===0);
+check('driver uploads own licence photo', !String(await as(D, `insert into storage.objects (bucket_id,name) values ('licence-photos','${D}/x/1.jpg')`)).startsWith('ERR'));
+check('office reads licence photos', (await as(O, `select * from storage.objects where bucket_id='licence-photos'`)).length===1);
+await q(fs.readFileSync(new URL('../migrations/0009_licence_renewals.sql', import.meta.url), 'utf8'));
+check('0009 can be run twice', true);
 if (failed) process.exit(1);

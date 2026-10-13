@@ -37,6 +37,7 @@ function RootStack() {
         <Stack.Screen name="drivers" options={{ title: 'Drivers' }} />
         <Stack.Screen name="driver/[id]" options={{ title: 'Driver' }} />
         <Stack.Screen name="company" options={{ title: 'Company details' }} />
+        <Stack.Screen name="licence-renewal" options={{ title: 'Renewed licence', presentation: 'modal' }} />
         <Stack.Screen name="profile" options={{ title: 'My details' }} />
         <Stack.Screen name="tracking-consent" options={{ title: 'Location consent', presentation: 'modal' }} />
         <Stack.Screen name="live-map" options={{ title: 'Live map' }} />

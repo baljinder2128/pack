@@ -6,7 +6,7 @@ name: Publish
 on:
   push:
     branches: [main, claude/project-thread-cw23rh]
-    paths-ignore: ['**.md', '.github/workflows/check-functions.yml']
+    paths-ignore: ['**.md', '.github/workflows/check-functions.yml', '.github/workflows/licence-alerts.yml']
   workflow_dispatch:
 
 permissions:

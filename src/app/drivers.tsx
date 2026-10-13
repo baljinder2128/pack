@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Segmented, Title, colors } from '@/components/ui';
@@ -20,6 +20,11 @@ function tempPassword(): string {
 
 export default function DriversScreen() {
   const { data, loading, error, reload } = useFocusQuery(() => listDrivers({ includeRemoved: true }), []);
+  // Also run the daily licence check (emails the office about licences expiring
+  // within a week; each licence is emailed once), in case the morning run missed.
+  useEffect(() => {
+    callFunction('licence-alerts', {}).catch(() => {});
+  }, []);
   const [adding, setAdding] = useState(false);
   const [showRemoved, setShowRemoved] = useState(false);
   const [name, setName] = useState('');

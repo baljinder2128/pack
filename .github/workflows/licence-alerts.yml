@@ -1,0 +1,17 @@
+# Every morning, asks the licence-alerts edge function to email the office about
+# any driver licence that expires within a week (each licence is emailed once).
+name: Licence alerts
+on:
+  schedule:
+    - cron: '7 21 * * *' # about 8am in Sydney
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run the licence check
+        run: |
+          curl -s -w "\nHTTP %{http_code}\n" -X POST -H "Content-Type: application/json" -d '{}' \
+            https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/licence-alerts

@@ -62,6 +62,11 @@ export default function MoreScreen() {
       <MenuList
         items={[
           { icon: 'person-circle-outline', label: 'My details', hint: 'Name, phone, ABN and password', onPress: () => router.push('/profile') },
+          ...(!isOffice
+            ? ([
+                { icon: 'card-outline', label: 'Renewed licence', hint: 'Send a photo of your new licence to the office', onPress: () => router.push('/licence-renewal') },
+              ] as MenuItem[])
+            : []),
           ...(isOffice
             ? ([
                 { icon: 'people-outline', label: 'Drivers & logins', hint: 'Add drivers, pay rates and office staff', onPress: () => router.push('/drivers') },
