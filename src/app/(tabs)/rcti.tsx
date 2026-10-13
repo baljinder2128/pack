@@ -223,20 +223,6 @@ export default function RctiScreen() {
               </>
             )}
           </Card>
-          <Card>
-            <Title>Each day</Title>
-            {w.days.map((d) => (
-              <Row key={d.date}>
-                <Text style={{ flex: 1 }}>{formatDate(d.date)}</Text>
-                <Text style={{ color: d.hours || d.trips ? colors.text : colors.warning, fontWeight: '600' }}>
-                  {d.hours || d.trips
-                    ? `${d.hours} hrs${d.trips ? ` · ${d.trips} trip${d.trips === 1 ? '' : 's'}` : ''}`
-                    : 'Nothing logged'}
-                </Text>
-              </Row>
-            ))}
-            <Muted>Check every day is right before issuing.</Muted>
-          </Card>
           {w.sundayEntries > 0 && (
             <Text style={{ color: colors.warning }}>
               {w.sundayEntries} entr{w.sundayEntries === 1 ? 'y is' : 'ies are'} on Sunday, which is outside the Monday to
@@ -252,6 +238,36 @@ export default function RctiScreen() {
           {isOffice && !tfn && !w.company.abn && (
             <Text style={{ color: colors.warning }}>Add your company ABN under More → Company details.</Text>
           )}
+          {tfn && <PayslipPanel driver={w.driver} company={w.company} pay={w.totals} start={start} isOffice={isOffice} />}
+          {!tfn && (
+            <>
+              {msg && <Text style={{ color: colors.success }}>{msg}</Text>}
+              <ErrorText>{actionError ?? week.error}</ErrorText>
+              {isOffice ? (
+                <>
+                  <Button title={w.issued ? 'Update RCTI & email PDF again' : 'Create RCTI & email PDF'} onPress={issue} busy={busy} />
+                  {w.issued && <Button title="Email this RCTI again" variant="secondary" onPress={emailAgain} busy={busy} />}
+                </>
+              ) : (
+                w.issued && <Button title="Download my RCTI (PDF)" onPress={download} busy={busy} />
+              )}
+              {isOffice && <Button title="Preview PDF" variant="secondary" onPress={download} busy={busy} />}
+            </>
+          )}
+          <Card>
+            <Title>Each day</Title>
+            {w.days.map((d) => (
+              <Row key={d.date}>
+                <Text style={{ flex: 1 }}>{formatDate(d.date)}</Text>
+                <Text style={{ color: d.hours || d.trips ? colors.text : colors.warning, fontWeight: '600' }}>
+                  {d.hours || d.trips
+                    ? `${d.hours} hrs${d.trips ? ` · ${d.trips} trip${d.trips === 1 ? '' : 's'}` : ''}`
+                    : 'Nothing logged'}
+                </Text>
+              </Row>
+            ))}
+            <Muted>Check every day is right before issuing.</Muted>
+          </Card>
           {w.totals.lines.map((l, i) => (
             <Card key={i}>
               <Row>
@@ -264,22 +280,6 @@ export default function RctiScreen() {
             </Card>
           ))}
           {w.totals.lines.length === 0 && <Empty>No paid trips or hours this week.</Empty>}
-          {tfn && <PayslipPanel driver={w.driver} company={w.company} pay={w.totals} start={start} isOffice={isOffice} />}
-          {!tfn && (
-            <>
-              {msg && <Text style={{ color: colors.success }}>{msg}</Text>}
-              <ErrorText>{actionError ?? week.error}</ErrorText>
-              {isOffice ? (
-                <>
-                  <Button title={w.issued ? 'Re-issue RCTI & email PDF' : 'Everything OK: issue RCTI & email PDF'} onPress={issue} busy={busy} />
-                  {w.issued && <Button title="Email this RCTI again" variant="secondary" onPress={emailAgain} busy={busy} />}
-                </>
-              ) : (
-                w.issued && <Button title="Download my RCTI (PDF)" onPress={download} busy={busy} />
-              )}
-              {isOffice && <Button title="Preview PDF" variant="secondary" onPress={download} busy={busy} />}
-            </>
-          )}
         </>
       ) : (
         <ErrorText>{week.error}</ErrorText>

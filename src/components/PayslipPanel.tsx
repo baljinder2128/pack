@@ -217,7 +217,7 @@ export function PayslipPanel({
       {isOffice && (
         <>
           <Button
-            title={issued ? 'Re-issue payslip & email PDF' : 'Everything OK: issue payslip & email PDF'}
+            title={issued ? 'Update payslip & email PDF again' : 'Create payslip & email PDF'}
             onPress={issue}
             busy={busy || q.loading}
           />
