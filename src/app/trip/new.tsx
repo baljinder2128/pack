@@ -33,7 +33,7 @@ export default function NewTrip() {
   const set = (key: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [key]: v }));
 
   useEffect(() => {
-    if (isOffice) listDrivers().then(setDrivers).catch(() => {});
+    if (isOffice) listDrivers().then((p) => setDrivers(p.filter((d) => d.role === 'driver'))).catch(() => {});
   }, [isOffice]);
 
   async function save() {
