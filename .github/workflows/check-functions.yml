@@ -38,3 +38,12 @@ jobs:
             -H "apikey: sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP" \
             -d '{"trip_id":"00000000-0000-0000-0000-000000000000"}' \
             https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/licence-alerts
+      - name: Are the places list, fleet numbers and photo clean-up live?
+        run: |
+          K=sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP
+          U=https://kovvxlnoezlzzlbavtez.supabase.co
+          # 200 [] means the table/column exists (rows are hidden without sign-in); an error names what's missing.
+          curl -s -w "\nplaces HTTP %{http_code}\n" "$U/rest/v1/places?select=id&limit=1" -H "apikey: $K"
+          curl -s -w "\nfleet_number HTTP %{http_code}\n" "$U/rest/v1/vehicles?select=fleet_number&limit=1" -H "apikey: $K"
+          # New licence-alerts code reports photosRemoved in the daily check's reply.
+          curl -s -w "\ndaily HTTP %{http_code}\n" -X POST -H "Content-Type: application/json" -H "apikey: $K" -d '{}' "$U/functions/v1/licence-alerts"
