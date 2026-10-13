@@ -70,15 +70,16 @@ Deno.serve(async (req) => {
   const filename = `Payslip-${slip.number}-${name.replace(/[^A-Za-z0-9]+/g, '-')}.pdf`;
   const cc = to[0] === office ? undefined : [office];
 
-  const gmailUser = Deno.env.get('GMAIL_USER');
-  const gmailPass = Deno.env.get('GMAIL_APP_PASSWORD');
+  // Tolerate spaces and quotes pasted in with the secrets.
+  const gmailUser = Deno.env.get('GMAIL_USER')?.trim().replace(/^["']|["']$/g, '');
+  const gmailPass = Deno.env.get('GMAIL_APP_PASSWORD')?.replace(/[\s"']/g, '');
   if (gmailUser && gmailPass) {
     // Port 465 (SSL): Supabase blocks outgoing 25 and 587.
     const mailer = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
-      auth: { user: gmailUser, pass: gmailPass.replace(/\s/g, '') },
+      auth: { user: gmailUser, pass: gmailPass },
     });
     try {
       await mailer.sendMail({
@@ -92,7 +93,14 @@ Deno.serve(async (req) => {
       });
       return json({ ok: true, to: to[0] });
     } catch (e) {
-      return json({ error: `Gmail could not send it: ${e instanceof Error ? e.message : e}` }, 502);
+      const message = e instanceof Error ? e.message : String(e);
+      // Say what was used (never the password itself) so a wrong secret is easy to spot.
+      const hint = /535|Invalid login/i.test(message)
+        ? ` Signed in as "${gmailUser}" with a ${gmailPass.length}-character app password` +
+          (gmailPass.length === 16 && /^[a-z]+$/i.test(gmailPass) ? '.' : ' (a Gmail app password is 16 letters).') +
+          ' Make sure the app password was created while signed in to that same Gmail.'
+        : '';
+      return json({ error: `Gmail could not send it: ${message.split('\n')[0]}${hint}` }, 502);
     }
   }
 
