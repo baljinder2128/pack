@@ -14,14 +14,14 @@ import { supabase } from '@/lib/supabase';
 import type { Trip } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
 
-type Filter = 'active' | 'recent' | 'runsheets' | 'archive';
+type Filter = 'active' | 'recent' | 'runsheets' | 'fuel' | 'archive';
 
 export default function TripsScreen() {
   const { isOffice, profile } = useAuth();
   const [filter, setFilter] = useState<Filter>('active');
 
   const { data, loading, error } = useFocusQuery(async () => {
-    if (filter === 'runsheets') return [] as Trip[];
+    if (filter === 'runsheets' || filter === 'fuel') return [] as Trip[];
     let q = supabase.from('trips').select('*, driver:profiles!trips_driver_id_fkey(full_name)');
     if (filter === 'archive') return unwrap(await q.not('archived_at', 'is', null).order('trip_date', { ascending: false }).limit(200)) as Trip[];
     q = q.is('archived_at', null);
@@ -59,11 +59,12 @@ export default function TripsScreen() {
           { value: 'active', label: 'Active' },
           { value: 'recent', label: '2 weeks' },
           { value: 'runsheets', label: 'Runsheets' },
+          { value: 'fuel', label: 'Fuel' },
           ...(isOffice ? [{ value: 'archive' as const, label: 'Archive' }] : []),
         ]}
       />
-      {filter === 'runsheets' ? (
-        <RunsheetList />
+      {filter === 'runsheets' || filter === 'fuel' ? (
+        <RunsheetList key={filter} kind={filter === 'fuel' ? 'fuel' : 'runsheet'} />
       ) : (
         <>
           <ErrorText>{error}</ErrorText>

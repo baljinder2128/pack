@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, Linking, Platform, Pressable, Text, View } from 'react-native';
 
@@ -7,6 +7,7 @@ import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { callFunction } from '@/lib/drivers';
 import { formatDate, formatDateTime } from '@/lib/format';
+import { money } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import type { Runsheet } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
@@ -33,6 +34,8 @@ export default function RunsheetDetail() {
     return { sheet, urls };
   }, [id]);
 
+  const noun = data?.sheet.kind === 'fuel' ? 'fuel docket' : 'runsheet';
+
   async function toggleChecked() {
     if (!data) return;
     setBusy(true);
@@ -52,7 +55,7 @@ export default function RunsheetDetail() {
     setError(null);
     try {
       await callFunction('licence-alerts', { runsheet_id: id });
-      alert('Emailed', 'The runsheet and its photos were emailed to the office.');
+      alert('Emailed', `The ${noun} and its photos were emailed to the office.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -62,7 +65,7 @@ export default function RunsheetDetail() {
 
   function remove() {
     if (!data) return;
-    alert('Delete this runsheet?', 'Its photos are deleted too. You can then send a new one.', [
+    alert(`Delete this ${noun}?`, 'Its photos are deleted too. You can then send a new one.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -76,7 +79,7 @@ export default function RunsheetDetail() {
             setBusy(false);
             return setError(
               e ? (/permission|policy/i.test(e.message) ? `${e.message}. The office needs to run the 0011 SQL in Supabase.` : e.message)
-                : 'The office has already checked this runsheet, so only the office can delete it.',
+                : `The office has already checked this ${noun}, so only the office can delete it.`,
             );
           }
           if (data.sheet.photo_paths.length) await supabase.storage.from('runsheet-photos').remove(data.sheet.photo_paths);
@@ -90,17 +93,23 @@ export default function RunsheetDetail() {
   if (loading && !data) return <Loading />;
   if (!data) return <ErrorText>{loadError ?? 'Not found'}</ErrorText>;
   const { sheet, urls } = data;
+  const fuel = sheet.kind === 'fuel';
 
   return (
     <Screen>
+      {fuel && <Stack.Screen options={{ title: 'Fuel docket' }} />}
       <Card>
-        <Title>Runsheet · {formatDate(sheet.run_date)}</Title>
+        <Title>
+          {fuel ? 'Fuel docket' : 'Runsheet'} · {formatDate(sheet.run_date)}
+        </Title>
         <Badge
           label={sheet.reviewed_at ? 'Checked by office' : 'Waiting for office'}
           color={sheet.reviewed_at ? colors.success : colors.warning}
         />
         <Text>Driver: {sheet.driver?.full_name ?? '-'}</Text>
         {sheet.truck_rego && <Text>Truck: {sheet.truck_rego}</Text>}
+        {sheet.litres != null && <Text>Litres: {sheet.litres}</Text>}
+        {sheet.fuel_cost != null && <Text>Cost: {money(sheet.fuel_cost)}</Text>}
         <Muted>Sent {formatDateTime(sheet.submitted_at)}</Muted>
         {sheet.notes && <Text style={{ marginTop: 4 }}>{sheet.notes}</Text>}
       </Card>
@@ -119,14 +128,14 @@ export default function RunsheetDetail() {
       <ErrorText>{error}</ErrorText>
       {isOffice && (
         <Button
-          title={sheet.reviewed_at ? 'Mark as not checked' : 'Checked: runsheet is OK'}
+          title={sheet.reviewed_at ? 'Mark as not checked' : `Checked: ${noun} is OK`}
           variant={sheet.reviewed_at ? 'secondary' : 'success'}
           onPress={toggleChecked}
           busy={busy}
         />
       )}
-      <Button title="Email this runsheet to the office" variant="secondary" onPress={emailOffice} busy={busy} />
-      {(isOffice || !sheet.reviewed_at) && <Button title="Delete runsheet" variant="danger" onPress={remove} busy={busy} />}
+      <Button title={`Email this ${noun} to the office`} variant="secondary" onPress={emailOffice} busy={busy} />
+      {(isOffice || !sheet.reviewed_at) && <Button title={`Delete ${noun}`} variant="danger" onPress={remove} busy={busy} />}
       {!isOffice && !sheet.reviewed_at && <Muted>Made a mistake? Delete it and send a new one.</Muted>}
     </Screen>
   );

@@ -163,4 +163,11 @@ await as(D, `insert into storage.objects (bucket_id,name) values ('runsheet-phot
 check('driver deletes own runsheet photo', (await as(D, `delete from storage.objects where bucket_id='runsheet-photos' and name='${D}/r/1.jpg' returning *`)).length>=1);
 await q(fs.readFileSync(new URL('../migrations/0011_delete_runsheets.sql', import.meta.url), 'utf8'));
 check('0011 can be run twice', true);
+// 0012: fuel dockets live in runsheets with kind = 'fuel'.
+check('driver submits a fuel docket', !String(await as(D, `insert into runsheets (driver_id,run_date,kind,litres,fuel_cost) values ('${D}','2026-10-13','fuel',350,680.5)`)).startsWith('ERR'));
+check('office sees fuel dockets', (await as(O, `select * from runsheets where kind='fuel'`)).length===1);
+check('old runsheets default to runsheet', (await db.query(`select count(*)::int n from runsheets where kind <> 'fuel' and kind <> 'runsheet'`)).rows[0].n===0);
+check('unknown kind rejected', String(await as(D, `insert into runsheets (driver_id,run_date,kind) values ('${D}','2026-10-13','pizza')`)).startsWith('ERR'));
+await q(fs.readFileSync(new URL('../migrations/0012_fuel_dockets.sql', import.meta.url), 'utf8'));
+check('0012 can be run twice', true);
 if (failed) process.exit(1);

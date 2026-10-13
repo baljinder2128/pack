@@ -12,8 +12,8 @@
 //                       licence that expires within 7 days, so calling it often is harmless.
 //   { renewal_id }   -> a driver sent a photo of their renewed licence: email it to the
 //                       office and update their expiry date. Needs the driver's sign-in.
-//   { runsheet_id }  -> a driver submitted their end-of-day runsheet: email the photos to
-//                       the office. Needs the driver's sign-in.
+//   { runsheet_id }  -> a driver submitted their end-of-day runsheet or a fuel docket:
+//                       email the photos to the office. Needs the driver's sign-in.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.16';
 
@@ -131,26 +131,35 @@ Deno.serve(async (req) => {
     if (sheet.driver_id !== auth.user.id && me?.role !== 'office') return json({ error: 'Not your runsheet' }, 403);
 
     const name = sheet.driver?.full_name ?? 'A driver';
+    const fuel = sheet.kind === 'fuel';
+    const label = fuel ? 'Fuel docket' : 'Runsheet';
+    const cost = sheet.fuel_cost != null ? `$${Number(sheet.fuel_cost).toFixed(2)}` : '';
     const safeName = name.replace(/[^A-Za-z0-9]+/g, '-');
     const attachments: Attachment[] = [];
     for (const [i, path] of (sheet.photo_paths as string[]).entries()) {
       const { data: blob } = await admin.storage.from('runsheet-photos').download(path);
       if (blob) {
         attachments.push({
-          filename: `Runsheet-${safeName}-${sheet.run_date}-${i + 1}.jpg`,
+          filename: `${fuel ? 'Fuel-docket' : 'Runsheet'}-${safeName}-${sheet.run_date}-${i + 1}.jpg`,
           base64: toBase64(new Uint8Array(await blob.arrayBuffer())),
           contentType: 'image/jpeg',
         });
       }
     }
     const html = `
-      <h2 style="margin:0 0 8px">Runsheet: ${escapeHtml(name)} - ${dmy(sheet.run_date)}</h2>
+      <h2 style="margin:0 0 8px">${label}: ${escapeHtml(name)} - ${dmy(sheet.run_date)}</h2>
       ${sheet.truck_rego ? `<p style="margin:0 0 4px"><b>Truck:</b> ${escapeHtml(sheet.truck_rego)}</p>` : ''}
+      ${sheet.litres != null ? `<p style="margin:0 0 4px"><b>Litres:</b> ${escapeHtml(sheet.litres)}</p>` : ''}
+      ${cost ? `<p style="margin:0 0 4px"><b>Cost:</b> ${cost}</p>` : ''}
       ${sheet.driver?.phone ? `<p style="margin:0 0 4px"><b>Phone:</b> ${escapeHtml(sheet.driver.phone)}</p>` : ''}
       ${sheet.notes ? `<p style="margin:0 0 4px"><b>Notes:</b> ${escapeHtml(sheet.notes)}</p>` : ''}
-      <p>${attachments.length} photo${attachments.length === 1 ? '' : 's'} of the runsheet attached. It is also in the app under Trips &gt; Runsheets.</p>`;
+      <p>${attachments.length} photo${attachments.length === 1 ? '' : 's'} of the ${label.toLowerCase()} attached. It is also in the app under Trips &gt; ${fuel ? 'Fuel' : 'Runsheets'}.</p>`;
     try {
-      await sendToOffice(`Runsheet - ${name} - ${dmy(sheet.run_date)}${sheet.truck_rego ? ` - ${sheet.truck_rego}` : ''}`, html, attachments);
+      await sendToOffice(
+        `${label} - ${name} - ${dmy(sheet.run_date)}${sheet.truck_rego ? ` - ${sheet.truck_rego}` : ''}${cost ? ` - ${cost}` : ''}`,
+        html,
+        attachments,
+      );
       return json({ ok: true });
     } catch (e) {
       return json({ error: `Saved, but the email to the office failed: ${e instanceof Error ? e.message : String(e)}` }, 502);

@@ -154,5 +154,8 @@ export type Runsheet = {
   photo_paths: string[];
   submitted_at: string;
   reviewed_at: string | null;
+  kind?: 'runsheet' | 'fuel';
+  litres?: number | null;
+  fuel_cost?: number | null;
   driver?: { full_name: string } | null;
 };

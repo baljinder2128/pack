@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 
@@ -6,13 +6,18 @@ import { Button, ErrorText, Field, Muted, Row, Screen, Title } from '@/component
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { callFunction } from '@/lib/drivers';
+import { numOrNull } from '@/lib/format';
 import { parseDateInput, toDMY, toISODate } from '@/lib/pay';
 import { newId, pickPhotos, uploadPhoto } from '@/lib/photos';
 import { supabase } from '@/lib/supabase';
 
-/** End of day: the driver photographs their runsheet and sends it to the office. */
+/** End of day: the driver photographs their runsheet (or a fuel docket) and sends it to the office. */
 export default function NewRunsheet() {
   const { session } = useAuth();
+  const fuel = useLocalSearchParams<{ kind?: string }>().kind === 'fuel';
+  const noun = fuel ? 'fuel docket' : 'runsheet';
+  const [litres, setLitres] = useState('');
+  const [cost, setCost] = useState('');
   const [date, setDate] = useState(toDMY(toISODate(new Date())));
   const [truck, setTruck] = useState('');
   const [notes, setNotes] = useState('');
@@ -30,7 +35,7 @@ export default function NewRunsheet() {
     if (!session) return;
     const runDate = parseDateInput(date);
     if (!runDate) return setError('Enter the date like 13/10/2026.');
-    if (!photos.length) return setError('Take a photo of your runsheet first.');
+    if (!photos.length) return setError(`Take a photo of your ${noun} first.`);
     setError(null);
     setBusy(true);
     try {
@@ -50,8 +55,14 @@ export default function NewRunsheet() {
         truck_rego: truck.trim().toUpperCase() || null,
         notes: notes.trim() || null,
         photo_paths: paths,
+        ...(fuel ? { kind: 'fuel', litres: numOrNull(litres), fuel_cost: numOrNull(cost) } : {}),
       });
-      if (e) throw new Error(/relation|schema cache|bucket/i.test(e.message) ? `${e.message}. The office needs to run the 0008 SQL in Supabase.` : e.message);
+      if (e)
+        throw new Error(
+          /relation|schema cache|bucket|kind|litres/i.test(e.message)
+            ? `${e.message}. The office needs to run the ${fuel ? '0012' : '0008'} SQL in Supabase.`
+            : e.message,
+        );
       setStatus('Emailing the office…');
       // The runsheet is saved either way; the email is a copy for the office inbox.
       const emailed = await callFunction('licence-alerts', { runsheet_id: id }).then(
@@ -59,7 +70,7 @@ export default function NewRunsheet() {
         (err) => (err instanceof Error ? err.message : String(err)),
       );
       alert(
-        'Runsheet sent',
+        fuel ? 'Fuel docket sent' : 'Runsheet sent',
         emailed ? `The office can see it in the app, but the email didn't go: ${emailed}` : 'The office can see it in the app and has it by email.',
       );
       router.back();
@@ -74,10 +85,25 @@ export default function NewRunsheet() {
 
   return (
     <Screen>
-      <Muted>At the end of the day, take a clear photo of each page of your runsheet and send it to the office.</Muted>
+      {fuel && <Stack.Screen options={{ title: 'Submit fuel docket' }} />}
+      <Muted>
+        {fuel
+          ? 'Take a clear photo of the fuel docket (receipt) and send it to the office.'
+          : 'At the end of the day, take a clear photo of each page of your runsheet and send it to the office.'}
+      </Muted>
       <Field label="Date (DD/MM/YYYY)" value={date} onChangeText={setDate} />
       <Field label="Truck rego" value={truck} onChangeText={setTruck} autoCapitalize="characters" />
-      <Title>Runsheet photos</Title>
+      {fuel && (
+        <Row>
+          <View style={{ flex: 1 }}>
+            <Field label="Litres" value={litres} onChangeText={setLitres} keyboardType="decimal-pad" placeholder="e.g. 350" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field label="Cost ($)" value={cost} onChangeText={setCost} keyboardType="decimal-pad" placeholder="e.g. 680.50" />
+          </View>
+        </Row>
+      )}
+      <Title>{fuel ? 'Docket photos' : 'Runsheet photos'}</Title>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {photos.map((uri, i) => (
           <Pressable key={uri + i} onLongPress={() => setPhotos((p) => p.filter((_, j) => j !== i))}>
@@ -97,7 +123,7 @@ export default function NewRunsheet() {
       <Field label="Notes (optional)" value={notes} onChangeText={setNotes} multiline />
       <ErrorText>{error}</ErrorText>
       {status && <Muted>{status}</Muted>}
-      <Button title="Submit runsheet" onPress={submit} busy={busy} />
+      <Button title={fuel ? 'Submit fuel docket' : 'Submit runsheet'} onPress={submit} busy={busy} />
     </Screen>
   );
 }

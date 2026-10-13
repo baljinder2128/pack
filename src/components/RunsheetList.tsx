@@ -4,26 +4,29 @@ import { Text } from 'react-native';
 import { Badge, Button, Card, Empty, ErrorText, Loading, Muted, Row, Title, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDate, formatDateTime } from '@/lib/format';
-import { addDays, toISODate } from '@/lib/pay';
+import { addDays, money, toISODate } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import type { Runsheet } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
 
-/** Trips tab, Runsheets: drivers send today's runsheet; office checks them. */
-export function RunsheetList() {
+/** Trips tab, Runsheets / Fuel: drivers send runsheets and fuel dockets; office checks them. */
+export function RunsheetList({ kind = 'runsheet' }: { kind?: 'runsheet' | 'fuel' }) {
   const { isOffice } = useAuth();
+  const fuel = kind === 'fuel';
+  const noun = fuel ? 'fuel docket' : 'runsheet';
   const today = toISODate(new Date());
   const { data, loading, error } = useFocusQuery(async () => {
     return unwrap(
       await supabase
         .from('runsheets')
         .select('*, driver:profiles!runsheets_driver_id_fkey(full_name)')
+        .eq('kind', kind)
         .gte('run_date', addDays(today, -30))
         .order('run_date', { ascending: false })
         .order('submitted_at', { ascending: false })
         .limit(300),
     ) as Runsheet[];
-  }, [today]);
+  }, [today, kind]);
 
   const sentToday = data?.some((r) => r.run_date === today);
   const waiting = data?.filter((r) => !r.reviewed_at).length ?? 0;
@@ -33,10 +36,10 @@ export function RunsheetList() {
       {!isOffice && (
         <>
           <Button
-            title={sentToday ? '+ Send another page for today' : "+ Submit today's runsheet"}
-            onPress={() => router.push('/runsheet/new')}
+            title={fuel ? '+ Submit a fuel docket' : sentToday ? '+ Send another page for today' : "+ Submit today's runsheet"}
+            onPress={() => router.push(fuel ? '/runsheet/new?kind=fuel' : '/runsheet/new')}
           />
-          {data && !sentToday && (
+          {data && !sentToday && !fuel && (
             <Text style={{ color: colors.warning, fontWeight: '600' }}>You haven't sent today's runsheet yet.</Text>
           )}
         </>
@@ -44,13 +47,13 @@ export function RunsheetList() {
       {isOffice && data && (
         <Muted>
           {waiting
-            ? `${waiting} runsheet${waiting === 1 ? '' : 's'} to check · last 30 days`
-            : 'All runsheets checked · last 30 days'}
+            ? `${waiting} ${noun}${waiting === 1 ? '' : 's'} to check · last 30 days`
+            : `All ${noun}s checked · last 30 days`}
         </Muted>
       )}
       <ErrorText>
-        {error && /runsheets|schema cache/i.test(error)
-          ? `${error}. Run the 0008 SQL in Supabase to turn on runsheets.`
+        {error && /runsheets|schema cache|kind/i.test(error)
+          ? `${error}. Run the ${fuel ? '0012' : '0008'} SQL in Supabase to turn on ${noun}s.`
           : error}
       </ErrorText>
       {loading && !data ? (
@@ -72,13 +75,15 @@ export function RunsheetList() {
               />
               <Muted>
                 {isOffice && r.driver ? `${r.driver.full_name} · ` : ''}
-                {r.truck_rego ? `${r.truck_rego} · ` : ''}sent {formatDateTime(r.submitted_at)}
+                {r.truck_rego ? `${r.truck_rego} · ` : ''}
+                {r.litres ? `${r.litres} L · ` : ''}
+                {r.fuel_cost ? `${money(r.fuel_cost)} · ` : ''}sent {formatDateTime(r.submitted_at)}
               </Muted>
             </Row>
           </Card>
         ))
       ) : (
-        <Empty>{isOffice ? 'No runsheets sent in the last 30 days.' : 'No runsheets sent yet.'}</Empty>
+        <Empty>{isOffice ? `No ${noun}s sent in the last 30 days.` : `No ${noun}s sent yet.`}</Empty>
       )}
     </>
   );
