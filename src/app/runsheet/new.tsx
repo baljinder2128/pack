@@ -2,6 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 
+import { RegoPicker } from '@/components/RegoPicker';
 import { Button, ErrorText, Field, Muted, Row, Screen, Title } from '@/components/ui';
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
@@ -92,7 +93,7 @@ export default function NewRunsheet() {
           : 'At the end of the day, take a clear photo of each page of your runsheet and send it to the office.'}
       </Muted>
       <Field label="Date (DD/MM/YYYY)" value={date} onChangeText={setDate} />
-      <Field label="Truck rego" value={truck} onChangeText={setTruck} autoCapitalize="characters" />
+      <RegoPicker kind="truck" label="Truck rego" value={truck} onChange={setTruck} />
       {fuel && (
         <Row>
           <View style={{ flex: 1 }}>

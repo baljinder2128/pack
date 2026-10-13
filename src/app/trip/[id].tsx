@@ -131,6 +131,7 @@ export default function TripDetail() {
           Truck: {trip.truck_rego}
           {trip.trailer_rego ? ` · Trailer: ${trip.trailer_rego}` : ''}
         </Text>
+        {trip.visy_trailer && <Text>Visy trailer: {trip.visy_trailer}</Text>}
         {trip.customer && <Text>Customer: {trip.customer}</Text>}
         {trip.job_ref && <Text>Job: {trip.job_ref}</Text>}
         <Text>

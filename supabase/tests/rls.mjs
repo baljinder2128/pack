@@ -180,4 +180,14 @@ check('office changes office email', (await as(O, `update company set office_ema
 check('driver cannot change office email', (await as(D, `update company set office_email='evil@x.com' returning *`)).length===0);
 await q(fs.readFileSync(new URL('../migrations/0013_load_accept_office_email.sql', import.meta.url), 'utf8'));
 check('0013 can be run twice', true);
+// 0014: office manages trucks and trailers; drivers read them.
+await q(fs.readFileSync(new URL('../migrations/0014_fleet.sql', import.meta.url), 'utf8'));
+check('office adds a truck', !String(await as(O, `insert into vehicles (kind,rego) values ('truck','XQ12AB')`)).startsWith('ERR'));
+check('driver reads trucks', (await as(D, `select * from vehicles`)).length===1);
+check('driver cannot add a truck', String(await as(D, `insert into vehicles (kind,rego) values ('truck','HACK1')`)).startsWith('ERR'));
+check('driver cannot remove a truck', (await as(D, `update vehicles set active=false returning *`)).length===0);
+check('office removes a truck', (await as(O, `update vehicles set active=false returning *`)).length===1);
+check('trip saves a Visy trailer number', !String(await as(D, `insert into trips (driver_id,pickup,dropoff,visy_trailer) values ('${D}','A','B','V123')`)).startsWith('ERR'));
+await q(fs.readFileSync(new URL('../migrations/0014_fleet.sql', import.meta.url), 'utf8'));
+check('0014 can be run twice', true);
 if (failed) process.exit(1);

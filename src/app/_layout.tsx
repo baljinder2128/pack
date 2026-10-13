@@ -32,6 +32,7 @@ function RootStack() {
         <Stack.Screen name="runsheet/new" options={{ title: 'Submit runsheet', presentation: 'modal' }} />
         <Stack.Screen name="runsheet/[id]" options={{ title: 'Runsheet' }} />
         <Stack.Screen name="fuel" options={{ title: 'Fuel dockets' }} />
+        <Stack.Screen name="fleet" options={{ title: 'Trucks & trailers' }} />
         <Stack.Screen name="shift/new" options={{ title: 'Log hours', presentation: 'modal' }} />
         <Stack.Screen name="inspection/new" options={{ title: 'Pre-trip inspection' }} />
         <Stack.Screen name="inspection/[id]" options={{ title: 'Inspection' }} />

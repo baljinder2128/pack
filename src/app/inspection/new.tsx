@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, Platform, Pressable, Text, View } from 'react-native';
 
+import { RegoPicker } from '@/components/RegoPicker';
 import { Button, Card, ErrorText, Field, Muted, Row, Screen, Title, Toggle, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { callFunction } from '@/lib/drivers';
@@ -112,8 +113,8 @@ export default function NewInspection() {
 
   return (
     <Screen>
-      <Field label="Truck rego" value={truck} onChangeText={setTruck} autoCapitalize="characters" />
-      <Field label="Trailer rego" value={trailer} onChangeText={setTrailer} autoCapitalize="characters" />
+      <RegoPicker kind="truck" label="Truck rego" value={truck} onChange={setTruck} />
+      <RegoPicker kind="trailer" label="Trailer rego" value={trailer} onChange={setTrailer} />
       <Field label="Odometer (km)" value={odometer} onChangeText={setOdometer} keyboardType="number-pad" />
 
       <Title>Checks</Title>

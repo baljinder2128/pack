@@ -2,6 +2,7 @@ import { Stack, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import { DriverPicker } from '@/components/DriverPicker';
+import { RegoPicker } from '@/components/RegoPicker';
 import { Button, ErrorText, Field, Muted, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { listDrivers } from '@/lib/drivers';
@@ -19,6 +20,7 @@ export default function NewTrip() {
     trip_date: toDMY(toISODate(new Date())),
     truck_rego: '',
     trailer_rego: '',
+    visy_trailer: '',
     customer: '',
     job_ref: '',
     pickup: '',
@@ -48,6 +50,7 @@ export default function NewTrip() {
         trip_date: tripDate,
         truck_rego: form.truck_rego.trim().toUpperCase(),
         trailer_rego: form.trailer_rego.trim().toUpperCase() || null,
+        ...(form.visy_trailer.trim() ? { visy_trailer: form.visy_trailer.trim().toUpperCase() } : {}),
         customer: form.customer.trim() || null,
         job_ref: form.job_ref.trim() || null,
         pickup: form.pickup.trim(),
@@ -70,8 +73,14 @@ export default function NewTrip() {
       {isOffice && <Muted>The driver sees this load in their app straight away, under Active trips.</Muted>}
       {isOffice && <DriverPicker drivers={drivers} value={driverId} onChange={setDriverId} />}
       <Field label="Date (DD/MM/YYYY)" value={form.trip_date} onChangeText={set('trip_date')} />
-      <Field label="Truck rego" value={form.truck_rego} onChangeText={set('truck_rego')} autoCapitalize="characters" />
-      <Field label="Trailer rego" value={form.trailer_rego} onChangeText={set('trailer_rego')} autoCapitalize="characters" />
+      <RegoPicker kind="truck" label="Truck rego" value={form.truck_rego} onChange={set('truck_rego')} />
+      <RegoPicker kind="trailer" label="Trailer rego" value={form.trailer_rego} onChange={set('trailer_rego')} />
+      <Field
+        label="Visy trailer number (if towing a Visy trailer)"
+        value={form.visy_trailer}
+        onChangeText={set('visy_trailer')}
+        autoCapitalize="characters"
+      />
       <Field label="Customer" value={form.customer} onChangeText={set('customer')} />
       <Field label="Job / docket number" value={form.job_ref} onChangeText={set('job_ref')} />
       <Field label="Pickup" value={form.pickup} onChangeText={set('pickup')} />

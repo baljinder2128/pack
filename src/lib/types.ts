@@ -46,6 +46,7 @@ export type Trip = {
   id: string;
   archived_at: string | null;
   accepted_at?: string | null;
+  visy_trailer?: string | null;
   driver_id: string;
   trip_date: string;
   truck_rego: string;
