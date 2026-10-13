@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, Linking, Platform, Pressable, Text, View } from 'react-native';
 
@@ -60,6 +60,33 @@ export default function RunsheetDetail() {
     }
   }
 
+  function remove() {
+    if (!data) return;
+    alert('Delete this runsheet?', 'Its photos are deleted too. You can then send a new one.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          setError(null);
+          // Delete the row first: if that's refused (already checked), the photos stay.
+          const { data: gone, error: e } = await supabase.from('runsheets').delete().eq('id', id).select('id');
+          if (e || !gone?.length) {
+            setBusy(false);
+            return setError(
+              e ? (/permission|policy/i.test(e.message) ? `${e.message}. The office needs to run the 0011 SQL in Supabase.` : e.message)
+                : 'The office has already checked this runsheet, so only the office can delete it.',
+            );
+          }
+          if (data.sheet.photo_paths.length) await supabase.storage.from('runsheet-photos').remove(data.sheet.photo_paths);
+          setBusy(false);
+          router.back();
+        },
+      },
+    ]);
+  }
+
   if (loading && !data) return <Loading />;
   if (!data) return <ErrorText>{loadError ?? 'Not found'}</ErrorText>;
   const { sheet, urls } = data;
@@ -99,6 +126,8 @@ export default function RunsheetDetail() {
         />
       )}
       <Button title="Email this runsheet to the office" variant="secondary" onPress={emailOffice} busy={busy} />
+      {(isOffice || !sheet.reviewed_at) && <Button title="Delete runsheet" variant="danger" onPress={remove} busy={busy} />}
+      {!isOffice && !sheet.reviewed_at && <Muted>Made a mistake? Delete it and send a new one.</Muted>}
     </Screen>
   );
 }

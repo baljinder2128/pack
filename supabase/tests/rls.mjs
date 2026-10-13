@@ -106,7 +106,7 @@ check('other driver cannot read them', (await as(D2, `select * from runsheets`))
 check('office reads all runsheets', (await as(O, `select * from runsheets`)).length===1);
 check('driver cannot mark reviewed', (await as(D, `update runsheets set reviewed_at=now() returning *`)).length===0);
 check('office marks reviewed', (await as(O, `update runsheets set reviewed_at=now() returning *`)).length===1);
-check('runsheets cannot be deleted', (await as(O, `delete from runsheets returning *`)).length===0);
+check('other driver cannot delete runsheets', (await as(D2, `delete from runsheets returning *`)).length===0);
 check('driver uploads own runsheet photo', !String(await as(D, `insert into storage.objects (bucket_id,name) values ('runsheet-photos','${D}/r/1.jpg')`)).startsWith('ERR'));
 check('driver cannot upload to another folder', String(await as(D, `insert into storage.objects (bucket_id,name) values ('runsheet-photos','${D2}/r/1.jpg')`)).startsWith('ERR'));
 check('office reads runsheet photos', (await as(O, `select * from storage.objects where bucket_id='runsheet-photos'`)).length===1);
@@ -151,4 +151,16 @@ check('driver cannot move hours into a paid week', String(await as(D, `update sh
 check('office still edits paid week hours', (await as(O, `update shifts set break_minutes=30 where shift_date='2026-10-05' returning *`)).length===1);
 await q(fs.readFileSync(new URL('../migrations/0010_pay_lock.sql', import.meta.url), 'utf8'));
 check('0010 can be run twice', true);
+// 0011: drivers delete their own unchecked runsheets; office deletes any.
+await q(fs.readFileSync(new URL('../migrations/0011_delete_runsheets.sql', import.meta.url), 'utf8'));
+await as(D, `insert into runsheets (driver_id,run_date) values ('${D}','2026-10-13')`);
+await as(D, `insert into runsheets (driver_id,run_date) values ('${D}','2026-10-14')`);
+await as(O, `update runsheets set reviewed_at=now() where driver_id='${D}' and run_date='2026-10-14'`);
+check('driver deletes own unchecked runsheet', (await as(D, `delete from runsheets where run_date='2026-10-13' and driver_id='${D}' returning *`)).length===1);
+check('driver cannot delete a checked runsheet', (await as(D, `delete from runsheets where run_date='2026-10-14' and driver_id='${D}' returning *`)).length===0);
+check('office deletes a checked runsheet', (await as(O, `delete from runsheets where run_date='2026-10-14' and driver_id='${D}' returning *`)).length===1);
+await as(D, `insert into storage.objects (bucket_id,name) values ('runsheet-photos','${D}/r/1.jpg')`);
+check('driver deletes own runsheet photo', (await as(D, `delete from storage.objects where bucket_id='runsheet-photos' and name='${D}/r/1.jpg' returning *`)).length>=1);
+await q(fs.readFileSync(new URL('../migrations/0011_delete_runsheets.sql', import.meta.url), 'utf8'));
+check('0011 can be run twice', true);
 if (failed) process.exit(1);

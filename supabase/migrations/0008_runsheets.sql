@@ -1,6 +1,6 @@
 -- End-of-day runsheets: the driver photographs their paper runsheet and submits it.
 -- Photos live in the runsheet-photos bucket under <driver id>/<runsheet id>/<n>.jpg.
--- Kept for the records: nobody can delete a runsheet. Safe to run more than once.
+-- Safe to run more than once. (0011 lets drivers delete unchecked runsheets.)
 create table if not exists public.runsheets (
   id uuid primary key default gen_random_uuid(),
   driver_id uuid not null references public.profiles (id) on delete restrict,
