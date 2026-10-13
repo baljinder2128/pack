@@ -38,27 +38,27 @@ Deno.serve(async (req) => {
   const to = Deno.env.get('INSPECTION_EMAIL') ?? 'sbtruckin@outlook.com';
   const from = Deno.env.get('EMAIL_FROM') ?? 'SBT Trucking <onboarding@resend.dev>';
 
-  // Check the caller is signed in and can see this inspection (RLS does the work).
-  const userClient = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
-  });
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+
+  // Check the caller is signed in, and is the driver who made it or office.
+  // Works with both the legacy and the new Supabase API keys.
+  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+  const { data: auth, error: authError } = await admin.auth.getUser(token);
+  if (authError || !auth.user) return json({ error: 'Please sign in again' }, 401);
+
   const { inspection_id } = await req.json().catch(() => ({}));
   if (!inspection_id) return json({ error: 'inspection_id is required' }, 400);
 
-  const { data: visible } = await userClient
-    .from('inspections')
-    .select('id')
-    .eq('id', inspection_id)
-    .maybeSingle();
-  if (!visible) return json({ error: 'Inspection not found' }, 404);
-
-  const admin = createClient(url, serviceKey);
   const { data: insp, error } = await admin
     .from('inspections')
     .select('*, driver:profiles!inspections_driver_id_fkey(full_name, phone)')
     .eq('id', inspection_id)
     .single();
   if (error || !insp) return json({ error: error?.message ?? 'Inspection not found' }, 404);
+  if (insp.driver_id !== auth.user.id) {
+    const { data: me } = await admin.from('profiles').select('role').eq('id', auth.user.id).maybeSingle();
+    if (me?.role !== 'office') return json({ error: 'Inspection not found' }, 404);
+  }
 
   if (!resendKey) {
     await admin.from('inspections').update({ email_error: 'RESEND_API_KEY not set' }).eq('id', inspection_id);
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
   if (!res.ok) {
     const message = await res.text();
     await admin.from('inspections').update({ email_error: message.slice(0, 500) }).eq('id', inspection_id);
-    return json({ error: 'Email failed to send' }, 502);
+    return json({ error: `Email failed to send: ${message.slice(0, 300)}` }, 502);
   }
 
   await admin

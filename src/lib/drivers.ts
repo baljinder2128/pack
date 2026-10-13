@@ -16,10 +16,18 @@ export async function callFunction<T = { ok: true }>(name: string, body: Record<
   const { data, error } = await supabase.functions.invoke(name, { body });
   if (error) {
     if (error instanceof FunctionsHttpError) {
-      const payload = await error.context.json().catch(() => null);
-      throw new Error(payload?.error ?? error.message);
+      const res = error.context as Response;
+      const text = await res.text().catch(() => '');
+      let message: string | undefined;
+      try {
+        message = JSON.parse(text)?.error ?? JSON.parse(text)?.message ?? JSON.parse(text)?.msg;
+      } catch {
+        message = text || undefined;
+      }
+      if (res.status === 404 && !message?.length) message = `The "${name}" function isn't deployed in Supabase yet.`;
+      throw new Error(`${message ?? error.message} (${name}, ${res.status})`);
     }
-    throw new Error(error.message);
+    throw new Error(`${error.message} (${name})`);
   }
   return data as T;
 }

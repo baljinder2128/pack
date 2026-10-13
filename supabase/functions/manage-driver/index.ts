@@ -29,14 +29,19 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const url = Deno.env.get('SUPABASE_URL')!;
-  const userClient = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
-  });
-  const { data: isOffice } = await userClient.rpc('is_office');
-  if (!isOffice) return json({ error: 'Only office users can manage drivers' }, 403);
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!serviceKey) return json({ error: 'Server is missing SUPABASE_SERVICE_ROLE_KEY' }, 500);
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 
-  const { data: caller } = await userClient.auth.getUser();
-  const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  // Work out who is calling from their sign-in token. This works with both
+  // the legacy and the new (publishable/secret) Supabase API keys.
+  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+  const { data: auth, error: authError } = await admin.auth.getUser(token);
+  if (authError || !auth.user) return json({ error: 'Please sign in again' }, 401);
+  const { data: me } = await admin.from('profiles').select('role, active').eq('id', auth.user.id).maybeSingle();
+  if (me?.role !== 'office' || !me.active) return json({ error: 'Only office users can manage drivers' }, 403);
+
+  const caller = { user: auth.user };
   const body = await req.json().catch(() => ({}));
 
   switch (body.action) {
@@ -57,10 +62,16 @@ Deno.serve(async (req) => {
       });
       if (error) return json({ error: error.message }, 400);
 
-      // The on_auth_user_created trigger made the profile; add the extras.
-      if (body.phone) {
-        await admin.from('profiles').update({ phone: String(body.phone) }).eq('id', data.user.id);
-      }
+      // The on_auth_user_created trigger normally makes the profile; upsert so
+      // the driver still shows up if that trigger is missing.
+      const { error: profileError } = await admin.from('profiles').upsert({
+        id: data.user.id,
+        full_name: fullName,
+        email,
+        role,
+        phone: body.phone ? String(body.phone) : null,
+      });
+      if (profileError) return json({ error: `Login made, but saving the profile failed: ${profileError.message}` }, 500);
       return json({ ok: true, user_id: data.user.id });
     }
 
