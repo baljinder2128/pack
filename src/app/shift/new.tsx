@@ -71,7 +71,12 @@ export default function NewShift() {
       ? await supabase.from('shifts').update(row).eq('id', params.id!)
       : await supabase.from('shifts').insert(row);
     setBusy(false);
-    if (error) return setError(error.message);
+    if (error)
+      return setError(
+        !isOffice && /row-level security/i.test(error.message)
+          ? 'That week has already been paid, so only the office can change its hours. Call the office.'
+          : error.message,
+      );
     router.back();
   }
 

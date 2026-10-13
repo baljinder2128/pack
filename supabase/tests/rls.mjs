@@ -138,4 +138,17 @@ check('driver uploads own licence photo', !String(await as(D, `insert into stora
 check('office reads licence photos', (await as(O, `select * from storage.objects where bucket_id='licence-photos'`)).length===1);
 await q(fs.readFileSync(new URL('../migrations/0009_licence_renewals.sql', import.meta.url), 'utf8'));
 check('0009 can be run twice', true);
+
+// 0010: hours in a week with an issued RCTI or payslip are office-only.
+await as(D, `insert into shifts (driver_id,shift_date,start_at,end_at) values ('${D}','2026-10-05','2026-10-05 07:00+10','2026-10-05 15:00+10')`);
+check('driver adds hours in an unpaid week', (await as(D, `select * from shifts where shift_date='2026-10-05'`)).length===1);
+await as(O, `insert into rctis (driver_id,week_start,week_end,subtotal,gst,total) values ('${D}','2026-10-05','2026-10-10',1,0,1)`);
+check('paid week hours leave the driver app', (await as(D, `select * from shifts where shift_date='2026-10-05'`)).length===0);
+check('driver cannot add hours to a paid week', String(await as(D, `insert into shifts (driver_id,shift_date,start_at,end_at) values ('${D}','2026-10-06','2026-10-06 07:00+10','2026-10-06 15:00+10')`)).startsWith('ERR'));
+check('driver cannot delete paid week hours', (await as(D, `delete from shifts where shift_date='2026-10-05' returning *`)).length===0);
+await as(D, `insert into shifts (driver_id,shift_date,start_at,end_at) values ('${D}','2026-11-30','2026-11-30 07:00+10','2026-11-30 15:00+10')`);
+check('driver cannot move hours into a paid week', String(await as(D, `update shifts set shift_date='2026-10-07' where shift_date='2026-11-30'`)).startsWith('ERR'));
+check('office still edits paid week hours', (await as(O, `update shifts set break_minutes=30 where shift_date='2026-10-05' returning *`)).length===1);
+await q(fs.readFileSync(new URL('../migrations/0010_pay_lock.sql', import.meta.url), 'utf8'));
+check('0010 can be run twice', true);
 if (failed) process.exit(1);
