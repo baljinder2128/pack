@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 
+import { AbnLookup } from '@/components/AbnLookup';
+import { formatAbn } from '@/lib/abn';
 import { Button, ErrorText, Field, Muted, Screen, Toggle } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -61,6 +63,13 @@ export default function ProfileScreen() {
       <Muted>Your business details are printed on your weekly RCTI.</Muted>
       <Field label="Business name" value={form.business_name} onChangeText={set('business_name')} />
       <Field label="ABN" value={form.abn} onChangeText={set('abn')} keyboardType="number-pad" />
+      <AbnLookup
+        abn={form.abn}
+        onResult={(r) => {
+          setForm((f) => ({ ...f, abn: formatAbn(r.abn), business_name: r.entityName }));
+          setGst(r.gstRegistered);
+        }}
+      />
       <Field label="Address" value={form.address} onChangeText={set('address')} multiline />
       <Toggle label="Registered for GST" value={gst} onChange={setGst} />
       <Field label="New password (leave blank to keep)" value={password} onChangeText={setPassword} secureTextEntry />

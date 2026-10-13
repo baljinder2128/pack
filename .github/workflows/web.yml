@@ -16,7 +16,8 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  # Queue new pushes rather than cancelling a build that is part-way through.
+  cancel-in-progress: false
 
 jobs:
   web:

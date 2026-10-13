@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
+import { AbnLookup } from '@/components/AbnLookup';
+import { formatAbn } from '@/lib/abn';
 import { Button, Card, ErrorText, Field, Loading, Muted, Screen, Segmented, Select, Title, Toggle } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { callFunction } from '@/lib/drivers';
@@ -153,6 +155,13 @@ export default function DriverScreen() {
       <Title>Business (for RCTI)</Title>
       <Field label="Business name" value={form.business_name} onChangeText={set('business_name')} />
       <Field label="ABN" value={form.abn} onChangeText={set('abn')} keyboardType="number-pad" />
+      <AbnLookup
+        abn={form.abn}
+        onResult={(r) => {
+          setForm((f) => ({ ...f, abn: formatAbn(r.abn), business_name: r.entityName }));
+          setGst(r.gstRegistered);
+        }}
+      />
       <Field label="Address" value={form.address} onChangeText={set('address')} multiline />
       <Toggle label="Registered for GST" value={gst} onChange={setGst} />
       <Button title="Save" onPress={save} busy={busy} />

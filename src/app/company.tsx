@@ -4,6 +4,8 @@ import { Button, ErrorText, Field, Loading, Muted, Screen } from '@/components/u
 import { supabase } from '@/lib/supabase';
 import type { Company } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
+import { AbnLookup } from '@/components/AbnLookup';
+import { formatAbn } from '@/lib/abn';
 
 // The business issuing the RCTIs (the "recipient" on each one).
 export default function CompanyScreen() {
@@ -33,6 +35,7 @@ export default function CompanyScreen() {
     <Screen>
       <Field label="Business name" value={form.name} onChangeText={set('name')} />
       <Field label="ABN" value={form.abn} onChangeText={set('abn')} keyboardType="number-pad" />
+      <AbnLookup abn={form.abn} onResult={(r) => setForm((f) => ({ ...f, abn: formatAbn(r.abn), name: r.entityName }))} />
       <Field label="Address" value={form.address} onChangeText={set('address')} multiline />
       <Field label="Email" value={form.email} onChangeText={set('email')} autoCapitalize="none" keyboardType="email-address" />
       <Field label="RCTI agreement wording" value={form.rcti_agreement} onChangeText={set('rcti_agreement')} multiline />
