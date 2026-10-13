@@ -43,7 +43,11 @@ async function signOutIfIdle() {
   if (Date.now() - last < SIGN_IN_AGAIN_AFTER) return;
   const tracking =
     Platform.OS !== 'web' && (await Location.hasStartedLocationUpdatesAsync(TRACKING_TASK).catch(() => false));
-  if (!tracking) await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+  if (tracking) return;
+  // Signed out means off duty, so the office map stops showing them.
+  const { data } = await supabase.auth.getSession();
+  if (data.session) await supabase.from('profiles').update({ on_duty: false }).eq('id', data.session.user.id).eq('on_duty', true);
+  await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

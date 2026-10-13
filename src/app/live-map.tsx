@@ -13,6 +13,8 @@ import type { LiveDriver } from '@/lib/types';
 import { MAP_HTML } from '@/components/MapFrame';
 
 const REFRESH_MS = 30 * 1000;
+// Only drivers who sent a location in the last 30 minutes go on the map.
+const ACTIVE_MS = 30 * 60 * 1000;
 
 export default function LiveMap() {
   const web = useRef<WebView>(null);
@@ -27,6 +29,7 @@ export default function LiveMap() {
   // Everyone on duty, including drivers whose phone hasn't sent a location yet.
   const [onDuty, setOnDuty] = useState<{ id: string; full_name: string; phone: string | null; on_duty_since: string | null }[]>([]);
 
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     let alive = true;
     async function load() {
@@ -49,7 +52,25 @@ export default function LiveMap() {
       alive = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [reloadKey]);
+
+  const active = drivers.filter((d) => Date.now() - new Date(d.recorded_at).getTime() <= ACTIVE_MS);
+
+  function markOffDuty(id: string, name: string) {
+    alert(`Set ${name} off duty?`, 'Use this if they finished without going off duty. They stop showing on the map.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Set off duty',
+        style: 'destructive',
+        onPress: async () => {
+          const { error: e } = await supabase.from('profiles').update({ on_duty: false }).eq('id', id);
+          if (e) setError(e.message);
+          if (selected === id) setSelected(null);
+          setReloadKey((k) => k + 1);
+        },
+      },
+    ]);
+  }
 
   // Track for the selected driver since they went on duty.
   useEffect(() => {
@@ -77,10 +98,10 @@ export default function LiveMap() {
     if (!ready) return;
     if (Platform.OS === 'web') {
       const win = frame.current?.contentWindow as (Window & { render?: (...a: unknown[]) => void }) | null;
-      win?.render?.(drivers, track, focus);
+      win?.render?.(active, track, focus);
     } else {
       web.current?.injectJavaScript(
-        `window.render(${JSON.stringify(drivers)}, ${JSON.stringify(track)}, ${JSON.stringify(focus)}); true;`,
+        `window.render(${JSON.stringify(active)}, ${JSON.stringify(track)}, ${JSON.stringify(focus)}); true;`,
       );
     }
     if (focus) setFocus(null);
@@ -121,21 +142,32 @@ export default function LiveMap() {
       <Screen>
         <Button title="Past routes: last 7 days" variant="secondary" onPress={() => router.push('/route-history')} />
         <Title>
-          {onDuty.length} on duty now · {drivers.length} on the map
+          {onDuty.length} on duty now · {active.length} on the map
         </Title>
         {updated && <Muted>Updated {formatTime(updated.toISOString())}, refreshes every 30 seconds</Muted>}
         <ErrorText>{error}</ErrorText>
         <SignalWarning showMapLink={false} />
         {onDuty.length === 0 && <Empty>No drivers are on duty right now.</Empty>}
         {onDuty
-          .filter((p) => !drivers.some((d) => d.driver_id === p.id))
+          .filter((p) => !active.some((d) => d.driver_id === p.id))
           .map((p) => (
             <Card key={p.id}>
               <Row>
                 <Title>{p.full_name}</Title>
-                <Text style={{ color: colors.warning, marginLeft: 'auto', fontWeight: '600' }}>No location yet</Text>
+                <Text style={{ color: colors.warning, marginLeft: 'auto', fontWeight: '600' }}>Not on the map</Text>
               </Row>
-              <Muted>On duty since {formatDateTime(p.on_duty_since)}. Their phone hasn't sent a location since then.</Muted>
+              <Muted>
+                On duty since {formatDateTime(p.on_duty_since)}.{' '}
+                {(() => {
+                  const last = drivers.find((d) => d.driver_id === p.id)?.recorded_at;
+                  return last
+                    ? `Last location ${formatDateTime(last)}, over 30 minutes ago (app closed, signed out, or no signal).`
+                    : "Their phone hasn't sent a location since then.";
+                })()}
+              </Muted>
+              <Text style={{ color: colors.danger, fontWeight: '700' }} onPress={() => markOffDuty(p.id, p.full_name)}>
+                Set off duty
+              </Text>
               {p.phone && (
                 <Text style={{ color: colors.primary }} onPress={() => Linking.openURL(`tel:${p.phone}`)}>
                   Call {p.phone}
@@ -143,7 +175,7 @@ export default function LiveMap() {
               )}
             </Card>
           ))}
-        {drivers.map((d) => {
+        {active.map((d) => {
           const stale = Date.now() - new Date(d.recorded_at).getTime() > STALE_MS;
           return (
             <Card key={d.driver_id} onPress={() => select(d)}>
