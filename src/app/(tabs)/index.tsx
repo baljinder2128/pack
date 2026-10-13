@@ -2,6 +2,7 @@ import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
+import { BaseLog } from '@/components/BaseLog';
 import { DutyCard } from '@/components/DutyCard';
 import { LicenceAlert } from '@/components/LicenceAlert';
 import { RunsheetList } from '@/components/RunsheetList';
@@ -45,6 +46,12 @@ export default function TripsScreen() {
         </>
       )}
       <Button title={isOffice ? '+ Plan a load for a driver' : '+ New trip'} onPress={() => router.push('/trip/new')} />
+      {!isOffice && profile?.on_duty && (
+        // Rail bases to Pacific National: the office sees them in the end-of-shift report.
+        <Card>
+          <BaseLog kind="rail" driverId={profile.id} since={profile.on_duty_since} />
+        </Card>
+      )}
       {!isOffice && filter === 'active' && !!data?.filter((t) => t.status === 'planned').length && (
         <Hero
           label="Loads planned for you"
