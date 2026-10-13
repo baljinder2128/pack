@@ -24,3 +24,10 @@ jobs:
               https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/$f | head -c 400
             echo
           done
+      - name: Is the runsheet email code deployed?
+        run: |
+          # New licence-alerts code answers 401 "Please sign in again" here; the old code runs the daily check instead.
+          curl -s -w "\nHTTP %{http_code}\n" -X POST -H "Content-Type: application/json" \
+            -H "apikey: sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP" \
+            -d '{"runsheet_id":"00000000-0000-0000-0000-000000000000"}' \
+            https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/licence-alerts
