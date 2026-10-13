@@ -1,8 +1,10 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, Text, View } from 'react-native';
 
 import { Badge, Button, Card, ErrorText, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
+import { setArchived } from '@/lib/archive';
+import { useAuth } from '@/lib/auth';
 import { callFunction } from '@/lib/drivers';
 import { formatDateTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +13,7 @@ import { unwrap, useFocusQuery } from '@/lib/useQuery';
 
 export default function InspectionDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { isOffice, session } = useAuth();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -91,6 +94,19 @@ export default function InspectionDetail() {
       </View>
       {!insp.emailed_at && <Button title="Send email again" onPress={resend} busy={busy} />}
       {msg && <Muted>{msg}</Muted>}
+      {isOffice && insp.archived_at && <Muted>Reviewed and archived {formatDateTime(insp.archived_at)}.</Muted>}
+      {isOffice && session && (
+        <Button
+          title={insp.archived_at ? 'Put back on the To review list' : 'Reviewed: remove from list'}
+          variant="secondary"
+          onPress={() =>
+            setArchived('inspections', id, !insp.archived_at, session.user.id).then(
+              (done) => done && router.back(),
+              (e: Error) => setMsg(e.message),
+            )
+          }
+        />
+      )}
     </Screen>
   );
 }

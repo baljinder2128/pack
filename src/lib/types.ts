@@ -35,6 +35,7 @@ export type TripStatus = 'planned' | 'in_progress' | 'completed';
 
 export type Trip = {
   id: string;
+  archived_at: string | null;
   driver_id: string;
   trip_date: string;
   truck_rego: string;
@@ -75,6 +76,7 @@ export type InspectionItem = { key: string; label: string; ok: boolean; note: st
 
 export type Inspection = {
   id: string;
+  archived_at: string | null;
   driver_id: string;
   truck_rego: string;
   trailer_rego: string | null;

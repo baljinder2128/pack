@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase';
 import type { Trip } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
 
-type Filter = 'active' | 'recent';
+type Filter = 'active' | 'recent' | 'archive';
 
 export default function TripsScreen() {
   const { isOffice, profile } = useAuth();
@@ -20,6 +20,8 @@ export default function TripsScreen() {
 
   const { data, loading, error } = useFocusQuery(async () => {
     let q = supabase.from('trips').select('*, driver:profiles!trips_driver_id_fkey(full_name)');
+    if (filter === 'archive') return unwrap(await q.not('archived_at', 'is', null).order('trip_date', { ascending: false }).limit(200)) as Trip[];
+    q = q.is('archived_at', null);
     if (filter === 'active') q = q.neq('status', 'completed').order('trip_date');
     else q = q.gte('trip_date', addDays(toISODate(new Date()), -14)).order('trip_date', { ascending: false });
     return unwrap(await q.limit(200)) as Trip[];
@@ -43,6 +45,7 @@ export default function TripsScreen() {
         options={[
           { value: 'active', label: 'Planned & on the road' },
           { value: 'recent', label: 'Last 2 weeks' },
+          ...(isOffice ? [{ value: 'archive' as const, label: 'Archive' }] : []),
         ]}
       />
       <ErrorText>{error}</ErrorText>
@@ -71,7 +74,13 @@ export default function TripsScreen() {
           </Card>
         ))
       ) : (
-        <Empty>{filter === 'active' ? 'No open trips. Tap New trip to add one.' : 'No trips in the last two weeks.'}</Empty>
+        <Empty>
+          {filter === 'active'
+            ? 'No open trips. Tap New trip to add one.'
+            : filter === 'archive'
+              ? 'Nothing archived yet.'
+              : 'No trips in the last two weeks.'}
+        </Empty>
       )}
     </Screen>
   );

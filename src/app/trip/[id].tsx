@@ -4,13 +4,13 @@ import { useState } from 'react';
 import { Text } from 'react-native';
 
 import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Title } from '@/components/ui';
+import { setArchived } from '@/lib/archive';
 import { useAuth } from '@/lib/auth';
 import { formatDate, formatDateTime, numOrNull, openMap, statusColor, statusLabel } from '@/lib/format';
 import { money } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import type { Trip } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
-import { alert } from '@/lib/alert';
 
 async function currentPosition(): Promise<{ lat: number; lng: number } | null> {
   const { status } = await Location.requestForegroundPermissionsAsync();
@@ -83,19 +83,13 @@ export default function TripDetail() {
     });
   }
 
-  function remove() {
-    alert('Delete trip?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('trips').delete().eq('id', id);
-          if (error) setActionError(error.message);
-          else router.back();
-        },
-      },
-    ]);
+  async function archive() {
+    if (!trip || !session) return;
+    try {
+      if (await setArchived('trips', trip.id, !trip.archived_at, session.user.id)) router.back();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
   }
 
   if (loading && !trip) return <Loading />;
@@ -170,7 +164,14 @@ export default function TripDetail() {
       )}
 
       <ErrorText>{actionError}</ErrorText>
-      {isOffice && <Button title="Delete trip" variant="danger" onPress={remove} />}
+      {isOffice && trip.archived_at && <Muted>Reviewed and archived {formatDateTime(trip.archived_at)}.</Muted>}
+      {isOffice && (
+        <Button
+          title={trip.archived_at ? 'Put back on the trip list' : 'Reviewed: remove from list'}
+          variant="secondary"
+          onPress={archive}
+        />
+      )}
     </Screen>
   );
 }

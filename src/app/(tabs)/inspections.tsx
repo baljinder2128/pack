@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 
-import { Badge, Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
+import { Badge, Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Segmented, Title, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDateTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
@@ -9,19 +10,26 @@ import { unwrap, useFocusQuery } from '@/lib/useQuery';
 
 export default function InspectionsScreen() {
   const { isOffice } = useAuth();
+  const [view, setView] = useState<'open' | 'archive'>('open');
   const { data, loading, error } = useFocusQuery(async () => {
-    return unwrap(
-      await supabase
-        .from('inspections')
-        .select('*, driver:profiles!inspections_driver_id_fkey(full_name)')
-        .order('created_at', { ascending: false })
-        .limit(50),
-    ) as Inspection[];
-  }, []);
+    let q = supabase.from('inspections').select('*, driver:profiles!inspections_driver_id_fkey(full_name)');
+    q = view === 'archive' ? q.not('archived_at', 'is', null) : q.is('archived_at', null);
+    return unwrap(await q.order('created_at', { ascending: false }).limit(view === 'archive' ? 200 : 50)) as Inspection[];
+  }, [view]);
 
   return (
     <Screen>
       <Button title="+ Start pre-trip inspection" onPress={() => router.push('/inspection/new')} />
+      {isOffice && (
+        <Segmented
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'open', label: 'To review' },
+            { value: 'archive', label: 'Archive (kept forever)' },
+          ]}
+        />
+      )}
       <ErrorText>{error}</ErrorText>
       {loading && !data ? (
         <Loading />
@@ -42,11 +50,12 @@ export default function InspectionsScreen() {
                 </Muted>
               </Row>
               {!i.emailed_at && <Muted>Email not sent yet</Muted>}
+              {i.archived_at && <Muted>Reviewed {formatDateTime(i.archived_at)}</Muted>}
             </Card>
           );
         })
       ) : (
-        <Empty>No inspections yet.</Empty>
+        <Empty>{view === 'archive' ? 'Nothing archived yet.' : 'No inspections to review.'}</Empty>
       )}
     </Screen>
   );

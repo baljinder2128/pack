@@ -54,4 +54,14 @@ check('driver uploads own photo', !String(await as(D, `insert into storage.objec
 check('driver cannot upload to other folder', String(await as(D, `insert into storage.objects (bucket_id,name) values ('inspection-photos','${D2}/i/1.jpg')`)).startsWith('ERR'));
 check('driver inserts own inspection', !String(await as(D, `insert into inspections (driver_id,truck_rego,items) values ('${D}','T1','[{"key":"tyres","ok":false}]')`)).startsWith('ERR'));
 check('other driver cannot read it', (await as(D2, `select * from inspections`)).length===0);
+const tripD = (await db.query(`select id from trips where driver_id='${D}'`)).rows[0].id;
+await as(D, `update trips set archived_at=now() where id='${tripD}'`);
+check('driver cannot archive a trip', (await db.query(`select archived_at from trips where id='${tripD}'`)).rows[0].archived_at === null);
+await as(O, `update trips set archived_at=now(), archived_by='${O}' where id='${tripD}'`);
+check('office archives a trip', (await db.query(`select archived_at from trips where id='${tripD}'`)).rows[0].archived_at !== null);
+await as(O, `delete from trips where id='${tripD}'`);
+check('trips cannot be deleted, even by office', (await db.query(`select 1 from trips where id='${tripD}'`)).rows.length === 1);
+await as(O, `update inspections set archived_at=now(), archived_by='${O}'`);
+check('office archives an inspection', (await db.query(`select count(*)::int n from inspections where archived_at is not null`)).rows[0].n === 1);
+check('inspections cannot be deleted', (await as(O, `delete from inspections returning *`)).length === 0);
 if (failed) process.exit(1);
