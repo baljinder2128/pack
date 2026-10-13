@@ -9,6 +9,7 @@ import { callFunction } from '@/lib/drivers';
 import { numOrNull } from '@/lib/format';
 import { LICENCE_CLASSES, STATES } from '@/lib/licence';
 import { parseDateInput, toDMY } from '@/lib/pay';
+import { cleanTfn, formatTfn, isValidTfn } from '@/lib/tfn';
 import { EMPLOYMENT_TYPES, TAX_SCALES, type EmploymentType, type TaxScale } from '@/lib/payroll';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Role } from '@/lib/types';
@@ -33,6 +34,7 @@ export default function DriverScreen() {
     start_date: '',
     super_fund: '',
     super_member_no: '',
+    tfn: '',
   });
   const [gst, setGst] = useState(true);
   const [payType, setPayType] = useState<'abn' | 'tfn'>('abn');
@@ -48,6 +50,8 @@ export default function DriverScreen() {
 
   const { data: driver, loading, reload } = useFocusQuery(async () => {
     const d = unwrap(await supabase.from('profiles').select('*').eq('id', id).single()) as Profile;
+    // Kept in its own office-only table. Missing before migration 0006 is run.
+    const { data: tfnRow } = await supabase.from('employee_tfns').select('tfn').eq('employee_id', id).maybeSingle();
     setForm({
       full_name: d.full_name,
       phone: d.phone ?? '',
@@ -62,6 +66,7 @@ export default function DriverScreen() {
       start_date: toDMY(d.start_date),
       super_fund: d.super_fund ?? '',
       super_member_no: d.super_member_no ?? '',
+      tfn: tfnRow?.tfn ? formatTfn(tfnRow.tfn) : '',
     });
     setGst(d.gst_registered);
     setPayType(d.pay_type ?? 'abn');
@@ -98,10 +103,12 @@ export default function DriverScreen() {
         dates[key] = parseDateInput(form[key]);
         if (!dates[key]) throw new Error(`${label}: enter the date like 25/12/2027.`);
       }
+      const { tfn, ...details } = form;
+      if (payType === 'tfn' && tfn.trim() && !isValidTfn(tfn)) throw new Error('That TFN is not valid. Check the 9 digits on their TFN declaration.');
       const { error } = await supabase
         .from('profiles')
         .update({
-          ...form,
+          ...details,
           hourly_rate: numOrNull(form.hourly_rate) ?? 0,
           licence_class: form.licence_class.trim().toUpperCase() || null,
           licence_state: form.licence_state.trim().toUpperCase() || null,
@@ -117,6 +124,11 @@ export default function DriverScreen() {
         })
         .eq('id', id);
       if (error) throw new Error(error.message);
+      if (payType !== 'tfn') return;
+      const { error: tfnError } = tfn.trim()
+        ? await supabase.from('employee_tfns').upsert({ employee_id: id, tfn: cleanTfn(tfn), updated_at: new Date().toISOString() })
+        : await supabase.from('employee_tfns').delete().eq('employee_id', id);
+      if (tfnError) throw new Error(`Details saved, but the TFN wasn't: ${tfnError.message}`);
     }, 'Saved.');
 
   function remove() {
@@ -189,6 +201,13 @@ export default function DriverScreen() {
             options={EMPLOYMENT_TYPES}
             onChange={(v) => v && setEmployment(v as EmploymentType)}
           />
+          <Field
+            label="Tax file number (TFN)"
+            value={form.tfn}
+            onChangeText={set('tfn')}
+            keyboardType="number-pad"
+            placeholder="e.g. 123 456 782"
+          />
           <Select
             label="Tax (from their TFN declaration)"
             value={taxScale}
@@ -199,7 +218,7 @@ export default function DriverScreen() {
           <Field label="Super fund" value={form.super_fund} onChangeText={set('super_fund')} placeholder="e.g. AustralianSuper" />
           <Field label="Super member number" value={form.super_member_no} onChangeText={set('super_member_no')} />
           <Muted>
-            Super is 12% on top of their pay. Keep their signed TFN declaration on file; the TFN itself isn't stored in the app.
+            Super is 12% on top of their pay. Only office can see the TFN; it isn't shown to the driver or printed on payslips.
           </Muted>
         </>
       )}

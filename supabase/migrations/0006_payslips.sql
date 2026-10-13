@@ -94,4 +94,23 @@ create policy "payslip pdfs: read own or office" on storage.objects
   for select to authenticated
   using (bucket_id = 'payslip-pdfs' and ((storage.foldername(name))[1] = auth.uid()::text or public.is_office()));
 
+-- Tax file numbers, kept apart from profiles so only office can see them
+-- (drivers and other screens never load this table).
+create table if not exists public.employee_tfns (
+  employee_id uuid primary key references public.profiles (id) on delete restrict,
+  tfn text not null check (tfn ~ '^[0-9]{8,9}$'),
+  updated_at timestamptz not null default now(),
+  updated_by uuid references public.profiles (id) default auth.uid()
+);
+alter table public.employee_tfns enable row level security;
+drop policy if exists "tfns: office read" on public.employee_tfns;
+create policy "tfns: office read" on public.employee_tfns for select using (public.is_office());
+drop policy if exists "tfns: office insert" on public.employee_tfns;
+create policy "tfns: office insert" on public.employee_tfns for insert with check (public.is_office());
+drop policy if exists "tfns: office update" on public.employee_tfns;
+create policy "tfns: office update" on public.employee_tfns for update using (public.is_office());
+drop policy if exists "tfns: office delete" on public.employee_tfns;
+create policy "tfns: office delete" on public.employee_tfns for delete using (public.is_office());
+grant select, insert, update, delete on public.employee_tfns to authenticated;
+
 notify pgrst, 'reload schema';

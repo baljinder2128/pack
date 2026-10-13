@@ -85,6 +85,10 @@ check('payslips cannot be deleted', (await as(O, `delete from payslips returning
 check('office stores a payslip PDF', !String(await as(O, `insert into storage.objects (bucket_id,name) values ('payslip-pdfs','${D}/Payslip-1.pdf')`)).startsWith('ERR'));
 check('employee reads own payslip PDF', (await as(D, `select * from storage.objects where bucket_id='payslip-pdfs'`)).length===1);
 check('other driver cannot read payslip PDF', (await as(D2, `select * from storage.objects where bucket_id='payslip-pdfs'`)).length===0);
+check('driver cannot save a TFN', String(await as(D, `insert into employee_tfns (employee_id,tfn) values ('${D}','123456782')`)).startsWith('ERR'));
+check('office saves a TFN', !String(await as(O, `insert into employee_tfns (employee_id,tfn) values ('${D}','123456782')`)).startsWith('ERR'));
+check('driver cannot read TFNs, even their own', (await as(D, `select * from employee_tfns`)).length===0);
+check('office reads TFN', (await as(O, `select * from employee_tfns`)).length===1);
 await q(fs.readFileSync(new URL('../migrations/0006_payslips.sql', import.meta.url), 'utf8'));
 check('0006 can be run twice', true);
 if (failed) process.exit(1);
