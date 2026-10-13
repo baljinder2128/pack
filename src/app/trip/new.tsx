@@ -6,7 +6,7 @@ import { Button, ErrorText, Field, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { listDrivers } from '@/lib/drivers';
 import { numOrNull } from '@/lib/format';
-import { isISODate, toISODate } from '@/lib/pay';
+import { parseDateInput, toDMY, toISODate } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
 
@@ -15,7 +15,7 @@ export default function NewTrip() {
   const [drivers, setDrivers] = useState<Profile[]>([]);
   const [driverId, setDriverId] = useState<string | null>(session?.user.id ?? null);
   const [form, setForm] = useState({
-    trip_date: toISODate(new Date()),
+    trip_date: toDMY(toISODate(new Date())),
     truck_rego: '',
     trailer_rego: '',
     customer: '',
@@ -35,7 +35,8 @@ export default function NewTrip() {
   }, [isOffice]);
 
   async function save() {
-    if (!isISODate(form.trip_date)) return setError('Date must be YYYY-MM-DD.');
+    const tripDate = parseDateInput(form.trip_date);
+    if (!tripDate) return setError('Enter the date like 13/10/2026.');
     if (!form.truck_rego.trim() || !form.pickup.trim() || !form.dropoff.trim())
       return setError('Truck rego, pickup and drop-off are required.');
     if (!driverId) return setError('Choose a driver.');
@@ -44,7 +45,7 @@ export default function NewTrip() {
       .from('trips')
       .insert({
         driver_id: driverId,
-        trip_date: form.trip_date,
+        trip_date: tripDate,
         truck_rego: form.truck_rego.trim().toUpperCase(),
         trailer_rego: form.trailer_rego.trim().toUpperCase() || null,
         customer: form.customer.trim() || null,
@@ -65,7 +66,7 @@ export default function NewTrip() {
   return (
     <Screen>
       {isOffice && <DriverPicker drivers={drivers} value={driverId} onChange={setDriverId} />}
-      <Field label="Date (YYYY-MM-DD)" value={form.trip_date} onChangeText={set('trip_date')} />
+      <Field label="Date (DD/MM/YYYY)" value={form.trip_date} onChangeText={set('trip_date')} />
       <Field label="Truck rego" value={form.truck_rego} onChangeText={set('truck_rego')} autoCapitalize="characters" />
       <Field label="Trailer rego" value={form.trailer_rego} onChangeText={set('trailer_rego')} autoCapitalize="characters" />
       <Field label="Customer" value={form.customer} onChangeText={set('customer')} />

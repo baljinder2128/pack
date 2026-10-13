@@ -19,6 +19,27 @@ export function isISODate(s: string): boolean {
   return toISODate(parseISODate(s)) === s;
 }
 
+/**
+ * Reads a date typed the Australian way (13/10/2026, 13-10-26, 13.10.2026)
+ * or as 2026-10-13. Returns YYYY-MM-DD, or null if it isn't a real date.
+ */
+export function parseDateInput(input: string): string | null {
+  const s = input.trim();
+  if (isISODate(s)) return s;
+  const m = s.match(/^(\d{1,2})[/.\- ](\d{1,2})[/.\- ](\d{2}|\d{4})$/);
+  if (!m) return null;
+  const year = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  const iso = `${year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return isISODate(iso) ? iso : null;
+}
+
+/** YYYY-MM-DD as DD/MM/YYYY, for date boxes. */
+export function toDMY(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  return `${d}/${m}/${y}`;
+}
+
 export function addDays(s: string, days: number): string {
   const d = parseISODate(s);
   d.setDate(d.getDate() + days);

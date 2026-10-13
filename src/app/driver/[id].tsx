@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { callFunction } from '@/lib/drivers';
 import { numOrNull } from '@/lib/format';
 import { LICENCE_CLASSES, STATES } from '@/lib/licence';
-import { isISODate } from '@/lib/pay';
+import { parseDateInput, toDMY } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Role } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
@@ -49,8 +49,8 @@ export default function DriverScreen() {
       licence_number: d.licence_number ?? '',
       licence_class: d.licence_class ?? '',
       licence_state: d.licence_state ?? '',
-      licence_expiry: d.licence_expiry ?? '',
-      start_date: d.start_date ?? '',
+      licence_expiry: toDMY(d.licence_expiry),
+      start_date: toDMY(d.start_date),
     });
     setGst(d.gst_registered);
     setRole(d.role);
@@ -74,11 +74,14 @@ export default function DriverScreen() {
 
   const save = () =>
     run(async () => {
+      const dates = { licence_expiry: null as string | null, start_date: null as string | null };
       for (const [key, label] of [
         ['licence_expiry', 'Licence expiry'],
         ['start_date', 'Start date'],
       ] as const) {
-        if (form[key] && !isISODate(form[key])) throw new Error(`${label} must be YYYY-MM-DD.`);
+        if (!form[key].trim()) continue;
+        dates[key] = parseDateInput(form[key]);
+        if (!dates[key]) throw new Error(`${label}: enter the date like 25/12/2027.`);
       }
       const { error } = await supabase
         .from('profiles')
@@ -87,8 +90,7 @@ export default function DriverScreen() {
           hourly_rate: numOrNull(form.hourly_rate) ?? 0,
           licence_class: form.licence_class.trim().toUpperCase() || null,
           licence_state: form.licence_state.trim().toUpperCase() || null,
-          licence_expiry: form.licence_expiry || null,
-          start_date: form.start_date || null,
+          ...dates,
           gst_registered: gst,
           role,
         })
@@ -142,12 +144,12 @@ export default function DriverScreen() {
       <Field label="Phone" value={form.phone} onChangeText={set('phone')} keyboardType="phone-pad" />
       <Field label="Hourly rate ($, inc GST)" value={form.hourly_rate} onChangeText={set('hourly_rate')} keyboardType="decimal-pad" />
       <Muted>A new rate is used for RCTIs issued from now on. RCTIs already issued keep their amounts.</Muted>
-      <Field label="Start date (YYYY-MM-DD)" value={form.start_date} onChangeText={set('start_date')} />
+      <Field label="Start date (DD/MM/YYYY)" value={form.start_date} onChangeText={set('start_date')} placeholder="e.g. 01/07/2025" />
       <Title>Licence</Title>
       <Field label="Licence number" value={form.licence_number} onChangeText={set('licence_number')} autoCapitalize="characters" />
       <Select label="Licence class" value={form.licence_class} options={LICENCE_CLASSES} onChange={set('licence_class')} />
       <Select label="State" value={form.licence_state} options={STATES} onChange={set('licence_state')} />
-      <Field label="Expiry (YYYY-MM-DD)" value={form.licence_expiry} onChangeText={set('licence_expiry')} />
+      <Field label="Licence expiry (DD/MM/YYYY)" value={form.licence_expiry} onChangeText={set('licence_expiry')} placeholder="e.g. 25/12/2027" />
       <Title>Business (for RCTI)</Title>
       <Field label="Business name" value={form.business_name} onChangeText={set('business_name')} />
       <Field label="ABN" value={form.abn} onChangeText={set('abn')} keyboardType="number-pad" />

@@ -53,3 +53,14 @@ test('no GST when driver is not registered', () => {
   assert.equal(r.gst, 0);
   assert.equal(r.total, 100);
 });
+
+test('reads Australian dates', async () => {
+  const { parseDateInput, toDMY } = await import('./pay.ts');
+  assert.equal(parseDateInput('25/12/2027'), '2027-12-25');
+  assert.equal(parseDateInput('5/1/27'), '2027-01-05');
+  assert.equal(parseDateInput('05-01-2027'), '2027-01-05');
+  assert.equal(parseDateInput('2027-01-05'), '2027-01-05');
+  assert.equal(parseDateInput('31/02/2027'), null);
+  assert.equal(parseDateInput('12/25/2027'), null);
+  assert.equal(toDMY('2027-01-05'), '05/01/2027');
+});
