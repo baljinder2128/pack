@@ -1,8 +1,8 @@
-import { router } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import { DriverPicker } from '@/components/DriverPicker';
-import { Button, ErrorText, Field, Screen } from '@/components/ui';
+import { Button, ErrorText, Field, Muted, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { listDrivers } from '@/lib/drivers';
 import { numOrNull } from '@/lib/format';
@@ -13,7 +13,8 @@ import type { Profile } from '@/lib/types';
 export default function NewTrip() {
   const { session, isOffice } = useAuth();
   const [drivers, setDrivers] = useState<Profile[]>([]);
-  const [driverId, setDriverId] = useState<string | null>(session?.user.id ?? null);
+  // Office plans loads for a driver, so they choose who; drivers log their own.
+  const [driverId, setDriverId] = useState<string | null>(isOffice ? null : session?.user.id ?? null);
   const [form, setForm] = useState({
     trip_date: toDMY(toISODate(new Date())),
     truck_rego: '',
@@ -65,6 +66,8 @@ export default function NewTrip() {
 
   return (
     <Screen>
+      {isOffice && <Stack.Screen options={{ title: 'Plan a load' }} />}
+      {isOffice && <Muted>The driver sees this load in their app straight away, under {'Planned & on the road'}.</Muted>}
       {isOffice && <DriverPicker drivers={drivers} value={driverId} onChange={setDriverId} />}
       <Field label="Date (DD/MM/YYYY)" value={form.trip_date} onChangeText={set('trip_date')} />
       <Field label="Truck rego" value={form.truck_rego} onChangeText={set('truck_rego')} autoCapitalize="characters" />

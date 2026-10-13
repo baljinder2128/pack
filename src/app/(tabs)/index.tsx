@@ -4,7 +4,7 @@ import { Text, View } from 'react-native';
 
 import { DutyCard } from '@/components/DutyCard';
 import { SignalWarning } from '@/components/SignalWarning';
-import { Badge, Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Segmented, Title } from '@/components/ui';
+import { Badge, Button, Card, Empty, ErrorText, Hero, Loading, Muted, Row, Screen, Segmented, Title } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDate, formatDateTime, statusColor, statusLabel } from '@/lib/format';
 import { addDays, toISODate } from '@/lib/pay';
@@ -38,7 +38,14 @@ export default function TripsScreen() {
       ) : (
         <DutyCard />
       )}
-      <Button title="+ New trip" onPress={() => router.push('/trip/new')} />
+      <Button title={isOffice ? '+ Plan a load for a driver' : '+ New trip'} onPress={() => router.push('/trip/new')} />
+      {!isOffice && filter === 'active' && !!data?.filter((t) => t.status === 'planned').length && (
+        <Hero
+          label="Loads planned for you"
+          value={String(data.filter((t) => t.status === 'planned').length)}
+          sub="Set by the office. Tap a load below for the details."
+        />
+      )}
       <Segmented
         value={filter}
         onChange={setFilter}
@@ -62,6 +69,7 @@ export default function TripsScreen() {
             <Row>
               <Badge label={statusLabel[t.status]} color={statusColor[t.status]} />
               <Muted>
+                {t.customer ? `${t.customer} · ` : ''}
                 {formatDate(t.trip_date)} · {t.truck_rego}
                 {isOffice && t.driver ? ` · ${t.driver.full_name}` : ''}
               </Muted>
