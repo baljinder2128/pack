@@ -33,7 +33,9 @@ export default function NewShift() {
   const hours = times ? shiftHours(times.start.toISOString(), times.end.toISOString(), breakMinutes) : null;
 
   async function save() {
-    if (!times) return setError('Enter the date like 13/10/2026 and start/finish times like 06:30.');
+    if (!times) return setError('Enter the date like 13/10/2026 and start/finish times like 06:30 or 4:30 pm.');
+    if (times.end.getTime() - times.start.getTime() >= 24 * 60 * 60000)
+      return setError('Start and finish are the same time. Change the finish time.');
     if (!driverId) return setError('Choose a driver.');
     setBusy(true);
     const { error } = await supabase.from('shifts').insert({
@@ -53,8 +55,8 @@ export default function NewShift() {
     <Screen>
       {isOffice && <DriverPicker drivers={drivers} value={driverId} onChange={setDriverId} />}
       <Field label="Date (DD/MM/YYYY)" value={date} onChangeText={setDate} />
-      <Field label="Start time (24h, e.g. 05:30)" value={startTime} onChangeText={setStartTime} keyboardType="numbers-and-punctuation" />
-      <Field label="Finish time (24h, e.g. 17:15)" value={endTime} onChangeText={setEndTime} keyboardType="numbers-and-punctuation" />
+      <Field label="Start time (e.g. 05:30 or 5:30 am)" value={startTime} onChangeText={setStartTime} keyboardType="numbers-and-punctuation" />
+      <Field label="Finish time (e.g. 17:15 or 5:15 pm)" value={endTime} onChangeText={setEndTime} keyboardType="numbers-and-punctuation" />
       <Field label="Breaks (minutes)" value={breakMin} onChangeText={setBreakMin} keyboardType="number-pad" />
       <Field label="Notes" value={notes} onChangeText={setNotes} multiline />
       {hours !== null && (

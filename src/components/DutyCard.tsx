@@ -4,7 +4,7 @@ import { Platform, Text } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
 import { formatTime } from '@/lib/format';
-import { toISODate } from '@/lib/pay';
+import { clock24, toISODate } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import { getSendStatus, onSendStatus, sendCurrentPosition, startTracking, stopTracking, type SendStatus } from '@/lib/tracking';
 import { Button, Card, ErrorText, Muted, Row, Title, colors } from './ui';
@@ -71,8 +71,8 @@ export function DutyCard() {
               pathname: '/shift/new',
               params: {
                 date: toISODate(start),
-                start: formatTime(since),
-                end: formatTime(new Date().toISOString()),
+                start: clock24(start),
+                end: clock24(new Date()),
               },
             }),
         },

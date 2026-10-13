@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildRcti, shiftHours, shiftTimes, weekStart, weekEnd, isISODate } from './pay.ts';
+import { buildRcti, clock24, parseTime, shiftHours, shiftTimes, weekStart, weekEnd, isISODate } from './pay.ts';
 
 test('weeks run Monday to Saturday', () => {
   assert.equal(weekStart('2026-10-12'), '2026-10-12'); // Monday
@@ -63,4 +63,17 @@ test('reads Australian dates', async () => {
   assert.equal(parseDateInput('31/02/2027'), null);
   assert.equal(parseDateInput('12/25/2027'), null);
   assert.equal(toDMY('2027-01-05'), '05/01/2027');
+});
+
+test('parseTime accepts 24h and the 12h times phones fill in', () => {
+  assert.equal(parseTime('05:30'), 330);
+  assert.equal(parseTime('1715'), 1035);
+  assert.equal(parseTime('7.30'), 450);
+  assert.equal(parseTime('04:41 pm'), 16 * 60 + 41);
+  assert.equal(parseTime('4:41PM'), 16 * 60 + 41);
+  assert.equal(parseTime('12:05 am'), 5);
+  assert.equal(parseTime('12:30 p.m.'), 750);
+  assert.equal(parseTime('13:00 pm'), null);
+  assert.equal(parseTime('25:00'), null);
+  assert.equal(clock24(new Date(2026, 9, 13, 16, 41)), '16:41');
 });

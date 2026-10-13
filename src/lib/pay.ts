@@ -58,14 +58,28 @@ export function weekEnd(start: string): string {
   return addDays(start, 5);
 }
 
-/** Parses "7:30", "0730" or "19:05" into minutes after midnight. */
+/** Parses "7:30", "0730", "19:05", "7.30" or "04:41 pm" into minutes after midnight. */
 export function parseTime(s: string): number | null {
-  const m = s.trim().match(/^(\d{1,2}):?(\d{2})$/);
+  const m = s
+    .trim()
+    .toLowerCase()
+    .replace(/(\d)\.(\d)/, '$1:$2')
+    .match(/^(\d{1,2}):?(\d{2})\s*([ap])?\.?m?\.?$/);
   if (!m) return null;
-  const h = Number(m[1]);
+  let h = Number(m[1]);
   const min = Number(m[2]);
+  if (m[3]) {
+    // 12-hour clock, as iPhones and Android phones set to 12h show it.
+    if (h < 1 || h > 12) return null;
+    h = (h % 12) + (m[3] === 'p' ? 12 : 0);
+  }
   if (h > 23 || min > 59) return null;
   return h * 60 + min;
+}
+
+/** "HH:MM" on the 24-hour clock, whatever the phone's own clock setting. */
+export function clock24(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 /**
