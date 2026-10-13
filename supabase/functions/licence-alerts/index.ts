@@ -12,6 +12,8 @@
 //                       licence that expires within 7 days, so calling it often is harmless.
 //   { renewal_id }   -> a driver sent a photo of their renewed licence: email it to the
 //                       office and update their expiry date. Needs the driver's sign-in.
+//   { runsheet_id }  -> a driver submitted their end-of-day runsheet: email the photos to
+//                       the office. Needs the driver's sign-in.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.16';
 
@@ -112,7 +114,48 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false },
   });
-  const { renewal_id } = await req.json().catch(() => ({}));
+  const { renewal_id, runsheet_id } = await req.json().catch(() => ({}));
+
+  if (runsheet_id) {
+    const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+    const { data: auth, error: authError } = await admin.auth.getUser(token);
+    if (authError || !auth.user) return json({ error: 'Please sign in again' }, 401);
+
+    const { data: sheet, error } = await admin
+      .from('runsheets')
+      .select('*, driver:profiles!runsheets_driver_id_fkey(full_name, phone)')
+      .eq('id', runsheet_id)
+      .single();
+    if (error || !sheet) return json({ error: error?.message ?? 'Runsheet not found' }, 404);
+    const { data: me } = await admin.from('profiles').select('role').eq('id', auth.user.id).maybeSingle();
+    if (sheet.driver_id !== auth.user.id && me?.role !== 'office') return json({ error: 'Not your runsheet' }, 403);
+
+    const name = sheet.driver?.full_name ?? 'A driver';
+    const safeName = name.replace(/[^A-Za-z0-9]+/g, '-');
+    const attachments: Attachment[] = [];
+    for (const [i, path] of (sheet.photo_paths as string[]).entries()) {
+      const { data: blob } = await admin.storage.from('runsheet-photos').download(path);
+      if (blob) {
+        attachments.push({
+          filename: `Runsheet-${safeName}-${sheet.run_date}-${i + 1}.jpg`,
+          base64: toBase64(new Uint8Array(await blob.arrayBuffer())),
+          contentType: 'image/jpeg',
+        });
+      }
+    }
+    const html = `
+      <h2 style="margin:0 0 8px">Runsheet: ${escapeHtml(name)} - ${dmy(sheet.run_date)}</h2>
+      ${sheet.truck_rego ? `<p style="margin:0 0 4px"><b>Truck:</b> ${escapeHtml(sheet.truck_rego)}</p>` : ''}
+      ${sheet.driver?.phone ? `<p style="margin:0 0 4px"><b>Phone:</b> ${escapeHtml(sheet.driver.phone)}</p>` : ''}
+      ${sheet.notes ? `<p style="margin:0 0 4px"><b>Notes:</b> ${escapeHtml(sheet.notes)}</p>` : ''}
+      <p>${attachments.length} photo${attachments.length === 1 ? '' : 's'} of the runsheet attached. It is also in the app under Trips &gt; Runsheets.</p>`;
+    try {
+      await sendToOffice(`Runsheet - ${name} - ${dmy(sheet.run_date)}${sheet.truck_rego ? ` - ${sheet.truck_rego}` : ''}`, html, attachments);
+      return json({ ok: true });
+    } catch (e) {
+      return json({ error: `Saved, but the email to the office failed: ${e instanceof Error ? e.message : String(e)}` }, 502);
+    }
+  }
 
   if (renewal_id) {
     const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');

@@ -5,6 +5,7 @@ import { Image, Pressable, View } from 'react-native';
 import { Button, ErrorText, Field, Muted, Row, Screen, Title } from '@/components/ui';
 import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
+import { callFunction } from '@/lib/drivers';
 import { parseDateInput, toDMY, toISODate } from '@/lib/pay';
 import { newId, pickPhotos, uploadPhoto } from '@/lib/photos';
 import { supabase } from '@/lib/supabase';
@@ -51,7 +52,16 @@ export default function NewRunsheet() {
         photo_paths: paths,
       });
       if (e) throw new Error(/relation|schema cache|bucket/i.test(e.message) ? `${e.message}. The office needs to run the 0008 SQL in Supabase.` : e.message);
-      alert('Runsheet sent', 'The office can see your runsheet now.');
+      setStatus('Emailing the office…');
+      // The runsheet is saved either way; the email is a copy for the office inbox.
+      const emailed = await callFunction('licence-alerts', { runsheet_id: id }).then(
+        () => null,
+        (err) => (err instanceof Error ? err.message : String(err)),
+      );
+      alert(
+        'Runsheet sent',
+        emailed ? `The office can see it in the app, but the email didn't go: ${emailed}` : 'The office can see it in the app and has it by email.',
+      );
       router.back();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
