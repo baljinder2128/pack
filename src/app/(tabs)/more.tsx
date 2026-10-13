@@ -26,7 +26,7 @@ export default function MoreScreen() {
         <Button
           title="Download the Android app"
           variant="secondary"
-          onPress={() => Linking.openURL('https://baljinder2128.github.io/pack/download/sbt-trucking.apk')}
+          onPress={() => Linking.openURL('https://baljinder2128.github.io/pack/download/sbt-truckin.apk')}
         />
       )}
       <Button title="Sign out" variant="danger" onPress={() => supabase.auth.signOut()} />

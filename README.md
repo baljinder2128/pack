@@ -1,4 +1,4 @@
-# SBT Trucking
+# SBT Truckin
 
 Android and iOS app for drivers and office staff:
 
@@ -29,7 +29,7 @@ Built with Expo (React Native) and Supabase (database, logins, photo storage, em
    npx supabase login
    npx supabase link --project-ref <your-project-ref>
    npx supabase secrets set RESEND_API_KEY=re_xxx INSPECTION_EMAIL=sbtruckin@outlook.com \
-     EMAIL_FROM="SBT Trucking <inspections@your-domain.com>"
+     EMAIL_FROM="SBT Truckin <inspections@your-domain.com>"
    npx supabase functions deploy send-inspection
    npx supabase functions deploy manage-driver
    ```
@@ -52,7 +52,7 @@ npx expo run:android   # or run:ios on a Mac; background tracking needs a real b
 ```
 
 Every push also builds the Android app and publishes it at
-**https://baljinder2128.github.io/pack/download/sbt-trucking.apk** (open on an Android phone to install).
+**https://baljinder2128.github.io/pack/download/sbt-truckin.apk** (open on an Android phone to install).
 
 Or build with EAS:
 

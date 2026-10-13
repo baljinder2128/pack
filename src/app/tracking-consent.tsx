@@ -11,7 +11,7 @@ const POINTS = [
   'Your location is only tracked while you are On duty. Tap "Go off duty" at any time to stop.',
   'While on duty the app records your position about once a minute, even when the app is in the background. A notification shows while this is happening.',
   'Office staff can see where you are on a map and may share your current location with customers to give delivery updates.',
-  'Location history is kept for 90 days and is not used outside SBT Trucking.',
+  'Location history is kept for 90 days and is not used outside SBT Truckin.',
   'You can withdraw consent by speaking to the office. You will not be tracked while off duty.',
 ];
 

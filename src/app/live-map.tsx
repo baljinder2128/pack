@@ -117,7 +117,7 @@ export default function LiveMap() {
 
   async function shareWithCustomer(d: LiveDriver) {
     const message =
-      `Delivery update from SBT Trucking: your driver ${d.full_name.split(' ')[0]} was here at ` +
+      `Delivery update from SBT Truckin: your driver ${d.full_name.split(' ')[0]} was here at ` +
       `${formatTime(d.recorded_at)}: ${mapsLink(d.lat, d.lng)}`;
     try {
       await Share.share({ message });

@@ -30,7 +30,7 @@ export default function SignIn() {
             resizeMode="contain"
             accessibilityLabel="SBT logo"
           />
-          <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text, textAlign: 'center' }}>SBT Trucking</Text>
+          <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text, textAlign: 'center' }}>SBT Truckin</Text>
           <Text style={{ color: colors.muted, textAlign: 'center' }}>Sign in with the login the office gave you.</Text>
           <Field
             label="Email"
@@ -46,14 +46,14 @@ export default function SignIn() {
           {Platform.OS === 'web' && (
             <Text
               style={{ color: colors.primary, textAlign: 'center', marginTop: 8 }}
-              onPress={() => Linking.openURL('https://baljinder2128.github.io/pack/download/sbt-trucking.apk')}
+              onPress={() => Linking.openURL('https://baljinder2128.github.io/pack/download/sbt-truckin.apk')}
             >
               Driver? Download the Android app
             </Text>
           )}
           {Platform.OS === 'web' && (
             <Muted>
-              iPhone: open this page in Safari, tap Share, then "Add to Home Screen" to install SBT Trucking.
+              iPhone: open this page in Safari, tap Share, then "Add to Home Screen" to install SBT Truckin.
             </Muted>
           )}
         </View>

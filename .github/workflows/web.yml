@@ -1,6 +1,6 @@
 # Publishes the app to GitHub Pages at https://baljinder2128.github.io/pack/
 #  - the web version (office use on Windows / any browser), deployed first
-#  - the Android app at /pack/download/sbt-trucking.apk, added once it builds
+#  - the Android app at /pack/download/sbt-truckin.apk (and the old sbt-trucking.apk name), added once it builds
 name: Publish
 
 on:
@@ -104,7 +104,7 @@ jobs:
         with:
           name: sbt-trucking-apk
           path: apk
-      - run: mkdir -p dist/download && mv apk/app-release.apk dist/download/sbt-trucking.apk
+      - run: mkdir -p dist/download && mv apk/app-release.apk dist/download/sbt-truckin.apk && cp dist/download/sbt-truckin.apk dist/download/sbt-trucking.apk
       - uses: actions/upload-pages-artifact@v3
         with:
           name: pages-full

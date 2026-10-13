@@ -1,4 +1,4 @@
--- SBT Trucking: trip log, driver hours and weekly RCTI.
+-- SBT Truckin: trip log, driver hours and weekly RCTI.
 -- Run this in the Supabase SQL editor (or `supabase db push`).
 
 -- ---------------------------------------------------------------------------

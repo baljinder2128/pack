@@ -1,7 +1,7 @@
 // Emails a submitted pre-trip inspection (with photos attached) to the office.
 //
 // Deploy:   supabase functions deploy send-inspection
-// Secrets:  supabase secrets set RESEND_API_KEY=... INSPECTION_EMAIL=sbtruckin@outlook.com EMAIL_FROM="SBT Trucking <inspections@yourdomain.com>"
+// Secrets:  supabase secrets set RESEND_API_KEY=... INSPECTION_EMAIL=sbtruckin@outlook.com EMAIL_FROM="SBT Truckin <inspections@yourdomain.com>"
 //
 // Called by the app right after an inspection row is inserted:
 //   supabase.functions.invoke('send-inspection', { body: { inspection_id } })
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const resendKey = Deno.env.get('RESEND_API_KEY');
   const to = Deno.env.get('INSPECTION_EMAIL') ?? 'sbtruckin@outlook.com';
-  const from = Deno.env.get('EMAIL_FROM') ?? 'SBT Trucking <onboarding@resend.dev>';
+  const from = Deno.env.get('EMAIL_FROM') ?? 'SBT Truckin <onboarding@resend.dev>';
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 

@@ -64,7 +64,7 @@ export async function startTracking(): Promise<string | null> {
     activityType: Location.ActivityType.AutomotiveNavigation,
     showsBackgroundLocationIndicator: true,
     foregroundService: {
-      notificationTitle: 'SBT Trucking: on duty',
+      notificationTitle: 'SBT Truckin: on duty',
       notificationBody: 'Your location is shared with the office. Go off duty in the app to stop.',
       notificationColor: '#1d4ed8',
     },
