@@ -134,8 +134,8 @@ export default function DriversScreen() {
               <Muted>
                 {d.licence_class ? `${d.licence_class} licence` : 'No licence on file'}
                 {d.licence_expiry ? ` · expires ${formatDate(d.licence_expiry)}` : ''}
-                {d.hourly_rate ? ` · ${money(d.hourly_rate)}/hr inc GST` : ''}
-                {d.abn ? ` · ABN ${d.abn}` : ''}
+                {d.hourly_rate ? ` · ${money(d.hourly_rate)}/hr${d.pay_type === 'tfn' ? '' : ' inc GST'}` : ''}
+                {d.pay_type === 'tfn' ? ' · TFN employee' : d.abn ? ` · ABN ${d.abn}` : ''}
               </Muted>
             )}
           </Card>

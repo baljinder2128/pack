@@ -15,7 +15,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Trips', tabBarIcon: icon('🚚') }} />
       <Tabs.Screen name="hours" options={{ title: 'Hours', tabBarIcon: icon('⏱') }} />
       <Tabs.Screen name="inspections" options={{ title: 'Pre-trip', tabBarIcon: icon('✅') }} />
-      <Tabs.Screen name="rcti" options={{ title: isOffice ? 'RCTI' : 'My pay', tabBarIcon: icon('🧾') }} />
+      <Tabs.Screen name="rcti" options={{ title: isOffice ? 'Pay' : 'My pay', tabBarIcon: icon('🧾') }} />
       <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: icon('☰') }} />
     </Tabs>
   );

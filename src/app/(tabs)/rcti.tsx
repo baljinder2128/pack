@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { Platform, Text } from 'react-native';
 
 import { DriverPicker } from '@/components/DriverPicker';
+import { PayslipPanel } from '@/components/PayslipPanel';
 import { WeekNav } from '@/components/WeekNav';
 import { Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -169,10 +170,11 @@ export default function RctiScreen() {
   }
 
   const w = week.data;
+  const tfn = w?.driver.pay_type === 'tfn';
 
   return (
     <Screen>
-      <Button title="RCTI archive: all issued RCTIs" variant="secondary" onPress={() => router.push('/rcti-archive')} />
+      <Button title="Archive: all RCTIs and payslips" variant="secondary" onPress={() => router.push('/rcti-archive')} />
       <WeekNav start={start} onChange={setStart} />
       {isOffice && drivers.data && (
         <DriverPicker drivers={drivers.data} value={selectedId} onChange={setDriverId} />
@@ -186,18 +188,22 @@ export default function RctiScreen() {
           <Card>
             <Title>{w.driver.full_name}</Title>
             <Muted>
-              {formatDate(start)} – {formatDate(weekEnd(start))}
+              {formatDate(start)} – {formatDate(weekEnd(start))} · {tfn ? 'TFN employee (payslip)' : 'ABN contractor (RCTI)'}
             </Muted>
-            <Text style={{ fontSize: 16 }}>Hours: {w.totals.hours}</Text>
-            <Text style={{ fontSize: 16 }}>Subtotal (ex GST): {money(w.totals.subtotal)}</Text>
-            <Text style={{ fontSize: 16 }}>GST included: {money(w.totals.gst)}</Text>
-            <Text style={{ fontSize: 18, fontWeight: '800' }}>Total (inc GST): {money(w.totals.total)}</Text>
-            {w.issued ? (
-              <Muted>
-                RCTI #{w.issued.number} issued {formatDateTime(w.issued.issued_at)}
-              </Muted>
-            ) : (
-              <Muted>Not issued yet</Muted>
+            {!tfn && (
+              <>
+                <Text style={{ fontSize: 16 }}>Hours: {w.totals.hours}</Text>
+                <Text style={{ fontSize: 16 }}>Subtotal (ex GST): {money(w.totals.subtotal)}</Text>
+                <Text style={{ fontSize: 16 }}>GST included: {money(w.totals.gst)}</Text>
+                <Text style={{ fontSize: 18, fontWeight: '800' }}>Total (inc GST): {money(w.totals.total)}</Text>
+                {w.issued ? (
+                  <Muted>
+                    RCTI #{w.issued.number} issued {formatDateTime(w.issued.issued_at)}
+                  </Muted>
+                ) : (
+                  <Muted>Not issued yet</Muted>
+                )}
+              </>
             )}
           </Card>
           <Card>
@@ -217,16 +223,16 @@ export default function RctiScreen() {
           {w.sundayEntries > 0 && (
             <Text style={{ color: colors.warning }}>
               {w.sundayEntries} entr{w.sundayEntries === 1 ? 'y is' : 'ies are'} on Sunday, which is outside the Monday to
-              Saturday pay week, so {w.sundayEntries === 1 ? 'it is' : 'they are'} not on this RCTI.
+              Saturday pay week, so {w.sundayEntries === 1 ? 'it is' : 'they are'} not paid this week.
             </Text>
           )}
           {w.openTrips > 0 && (
             <Text style={{ color: colors.warning }}>
-              {w.openTrips} trip(s) this week are not completed and are left off the RCTI.
+              {w.openTrips} trip(s) this week are not completed and are left off this week's pay.
             </Text>
           )}
-          {isOffice && !w.driver.abn && <Text style={{ color: colors.warning }}>This driver has no ABN on file.</Text>}
-          {isOffice && !w.company.abn && (
+          {isOffice && !tfn && !w.driver.abn && <Text style={{ color: colors.warning }}>This driver has no ABN on file.</Text>}
+          {isOffice && !tfn && !w.company.abn && (
             <Text style={{ color: colors.warning }}>Add your company ABN under More → Company details.</Text>
           )}
           {w.totals.lines.map((l, i) => (
@@ -241,17 +247,22 @@ export default function RctiScreen() {
             </Card>
           ))}
           {w.totals.lines.length === 0 && <Empty>No paid trips or hours this week.</Empty>}
-          {msg && <Text style={{ color: colors.success }}>{msg}</Text>}
-          <ErrorText>{actionError ?? week.error}</ErrorText>
-          {isOffice ? (
+          {tfn && <PayslipPanel driver={w.driver} company={w.company} pay={w.totals} start={start} isOffice={isOffice} />}
+          {!tfn && (
             <>
-              <Button title={w.issued ? 'Re-issue RCTI & email PDF' : 'Everything OK: issue RCTI & email PDF'} onPress={issue} busy={busy} />
-              {w.issued && <Button title="Email this RCTI again" variant="secondary" onPress={emailAgain} busy={busy} />}
+              {msg && <Text style={{ color: colors.success }}>{msg}</Text>}
+              <ErrorText>{actionError ?? week.error}</ErrorText>
+              {isOffice ? (
+                <>
+                  <Button title={w.issued ? 'Re-issue RCTI & email PDF' : 'Everything OK: issue RCTI & email PDF'} onPress={issue} busy={busy} />
+                  {w.issued && <Button title="Email this RCTI again" variant="secondary" onPress={emailAgain} busy={busy} />}
+                </>
+              ) : (
+                w.issued && <Button title="Download my RCTI (PDF)" onPress={download} busy={busy} />
+              )}
+              {isOffice && <Button title="Preview PDF" variant="secondary" onPress={download} busy={busy} />}
             </>
-          ) : (
-            w.issued && <Button title="Download my RCTI (PDF)" onPress={download} busy={busy} />
           )}
-          {isOffice && <Button title="Preview PDF" variant="secondary" onPress={download} busy={busy} />}
         </>
       ) : (
         <ErrorText>{week.error}</ErrorText>

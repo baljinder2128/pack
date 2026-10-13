@@ -9,13 +9,13 @@ import type { Company, Profile } from './types.ts';
 const A4: [number, number] = [595.28, 841.89];
 const M = 40; // page margin
 
-function dmy(iso: string): string {
+export function dmy(iso: string): string {
   const [y, m, d] = iso.slice(0, 10).split('-');
   return `${d}/${m}/${y}`;
 }
 
 /** Standard PDF fonts only cover Latin-1, so swap anything else for '?'. */
-function clean(s: unknown): string {
+export function clean(s: unknown): string {
   return String(s ?? '')
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')
@@ -24,7 +24,7 @@ function clean(s: unknown): string {
     .replace(/[^\x20-\x7e\xa0-\xff]/g, '?');
 }
 
-function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
+export function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
   const lines: string[] = [];
   for (const para of clean(text).split('\n')) {
     let line = '';

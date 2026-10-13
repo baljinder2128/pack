@@ -1,3 +1,5 @@
+import type { EmploymentType, TaxScale } from './payroll.ts';
+
 export type Role = 'driver' | 'office';
 
 export type Profile = {
@@ -20,6 +22,12 @@ export type Profile = {
   licence_state: string | null;
   licence_expiry: string | null;
   start_date: string | null;
+  pay_type: 'abn' | 'tfn';
+  employment_type: EmploymentType;
+  tax_scale: TaxScale;
+  has_study_loan: boolean;
+  super_fund: string | null;
+  super_member_no: string | null;
 };
 
 export type Company = {
@@ -102,6 +110,28 @@ export type Rcti = {
   total: number;
   issued_at: string;
   pdf_path: string | null;
+};
+
+export type Payslip = {
+  id: string;
+  number: number;
+  employee_id: string;
+  week_start: string;
+  week_end: string;
+  pay_date: string;
+  hours: number;
+  gross: number;
+  tax: number;
+  stsl: number;
+  net: number;
+  super: number;
+  annual_leave: number;
+  personal_leave: number;
+  ytd_gross: number;
+  ytd_tax: number;
+  ytd_super: number;
+  pdf_path: string | null;
+  issued_at: string;
 };
 
 export type LiveDriver = {
