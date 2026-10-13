@@ -106,19 +106,24 @@ export async function rctiPdf(opts: {
   ]);
   y = Math.min(yA, yB) - 16;
 
-  // Lines table
-  const inc = driver.gst_registered ? ' (inc GST)' : '';
-  const cols = { date: M, desc: M + 62, qtyR: A4[0] - M - 190, rateR: A4[0] - M - 95, amtR: A4[0] - M };
-  const header = () => {
+  // Same layout as the payslip: grey section bands, logo top right.
+  const band = (title: string) => {
+    newPageIfNeeded(40);
     page.drawRectangle({ x: M, y: y - 4, width: A4[0] - 2 * M, height: 16, color: rgb(0.93, 0.94, 0.96) });
-    text('Date', cols.date + 2, 9, bold);
-    text('Description', cols.desc, 9, bold);
-    right('Qty', cols.qtyR, 9, bold);
-    right(`Rate${inc}`, cols.rateR, 9, bold);
-    right(`Amount${inc}`, cols.amtR - 2, 9, bold);
-    y -= 18;
+    text(title, M + 4, 10, bold);
+    y -= 20;
   };
-  header();
+
+  // Work this week
+  const inc = driver.gst_registered ? ' (inc GST)' : '';
+  const cols = { date: M + 4, desc: M + 66, qtyR: A4[0] - M - 190, rateR: A4[0] - M - 95, amtR: A4[0] - M - 4 };
+  band('Work this week');
+  text('Date', cols.date, 9, bold);
+  text('Description', cols.desc, 9, bold);
+  right('Qty', cols.qtyR, 9, bold);
+  right(`Rate${inc}`, cols.rateR, 9, bold);
+  right(`Amount${inc}`, cols.amtR, 9, bold);
+  y -= 14;
   if (totals.lines.length === 0) {
     text('No paid work this period.', cols.desc, 10);
     y -= 14;
@@ -126,28 +131,27 @@ export async function rctiPdf(opts: {
   for (const l of totals.lines) {
     const desc = wrap(l.description, font, 9, cols.qtyR - cols.desc - 50);
     newPageIfNeeded(desc.length * 12 + 6);
-    if (y === A4[1] - M) header();
-    text(dmy(l.date), cols.date + 2, 9);
+    text(dmy(l.date), cols.date, 9);
     right(`${l.quantity} ${l.unit}`, cols.qtyR, 9);
-    right(money(l.rate), cols.rateR, 9);
-    right(money(l.amount), cols.amtR - 2, 9);
+    right(`${money(l.rate)}${l.unit === 'hrs' ? '/hr' : ''}`, cols.rateR, 9);
+    right(money(l.amount), cols.amtR, 9);
     for (const d of desc) {
       text(d, cols.desc, 9);
       y -= 12;
     }
-    page.drawLine({ start: { x: M, y: y + 6 }, end: { x: A4[0] - M, y: y + 6 }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) });
-    y -= 4;
+    y -= 2;
   }
 
-  // Totals
-  newPageIfNeeded(90);
-  y -= 8;
-  const labelX = A4[0] - M - 230;
+  // Payment summary
+  const labelX = M + 4;
   const row = (label: string, value: string, f = font, size = 10) => {
+    newPageIfNeeded(size + 8);
     text(label, labelX, size, f);
-    right(value, cols.amtR - 2, size, f);
+    right(value, cols.amtR, size, f);
     y -= size + 6;
   };
+  y -= 6;
+  band('Payment summary');
   row('Total hours', String(totals.hours));
   row('Subtotal (ex GST)', money(totals.subtotal));
   row(driver.gst_registered ? 'GST included (1/11)' : 'GST (supplier not registered)', money(totals.gst));
@@ -155,10 +159,11 @@ export async function rctiPdf(opts: {
   row('Total payable', money(totals.total), bold, 13);
 
   // Agreement
-  y -= 16;
-  for (const l of wrap(company.rcti_agreement, font, 8, A4[0] - 2 * M)) {
+  y -= 6;
+  band('RCTI agreement');
+  for (const l of wrap(company.rcti_agreement, font, 8, A4[0] - 2 * M - 8)) {
     newPageIfNeeded(12);
-    text(l, M, 8, font, rgb(0.3, 0.3, 0.3));
+    text(l, M + 4, 8, font, rgb(0.3, 0.3, 0.3));
     y -= 10;
   }
   return doc.save();

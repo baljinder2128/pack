@@ -154,6 +154,18 @@ export default function RctiScreen() {
     if (!w) return;
     setBusy(true);
     try {
+      if (Platform.OS === 'web') {
+        // Show the same PDF that gets emailed and archived.
+        const pdf = await rctiPdf({
+          number: w.issued?.number ?? null,
+          issuedAt: w.issued?.issued_at ?? new Date().toISOString(),
+          weekStart: start,
+          weekEnd: weekEnd(start),
+          ...w,
+        });
+        window.open(URL.createObjectURL(new Blob([pdf as BlobPart], { type: 'application/pdf' })), '_blank');
+        return;
+      }
       await sharePdf(
         rctiHtml({
           number: w.issued?.number ?? null,
