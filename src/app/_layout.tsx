@@ -30,6 +30,7 @@ function RootStack() {
         <Stack.Screen name="profile" options={{ title: 'My details' }} />
         <Stack.Screen name="tracking-consent" options={{ title: 'Location consent', presentation: 'modal' }} />
         <Stack.Screen name="live-map" options={{ title: 'Live map' }} />
+        <Stack.Screen name="route-history" options={{ title: 'Past routes' }} />
         <Stack.Screen name="rcti-archive" options={{ title: 'Pay archive' }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>

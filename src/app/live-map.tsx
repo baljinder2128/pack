@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { createElement, useEffect, useRef, useState } from 'react';
 import { Linking, Platform, Share, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -9,41 +10,9 @@ import { formatDateTime, formatTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import { mapsLink } from '@/lib/tracking';
 import type { LiveDriver } from '@/lib/types';
+import { MAP_HTML } from '@/components/MapFrame';
 
 const REFRESH_MS = 30 * 1000;
-
-// OpenStreetMap via Leaflet: no API key needed. `window.render` is called from
-// React Native with the latest positions and the selected driver's track.
-const MAP_HTML = `<!doctype html><html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>html,body,#map{height:100%;margin:0}.lbl{background:#1d4ed8;color:#fff;border:0;font-weight:600}</style>
-</head><body><div id="map"></div><script>
-  // Native: messages go through the WebView bridge. Web: to the parent page.
-  window.send = function (m) {
-    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(m);
-    else window.parent.postMessage({ sbtMap: m }, '*');
-  };
-  var map = L.map('map').setView([-33.87, 151.21], 5);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
-  var layer = L.layerGroup().addTo(map);
-  var fitted = false;
-  window.render = function (drivers, track, focus) {
-    layer.clearLayers();
-    var bounds = [];
-    drivers.forEach(function (d) {
-      var m = L.circleMarker([d.lat, d.lng], { radius: 9, color: '#fff', weight: 2, fillColor: '#1d4ed8', fillOpacity: 1 }).addTo(layer);
-      m.bindTooltip(d.full_name, { permanent: true, direction: 'top', className: 'lbl', offset: [0, -8] });
-      m.on('click', function () { window.send(d.driver_id); });
-      bounds.push([d.lat, d.lng]);
-    });
-    if (track && track.length > 1) L.polyline(track, { color: '#b45309', weight: 4 }).addTo(layer);
-    if (focus) map.setView(focus, 13);
-    else if (!fitted && bounds.length) { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 }); fitted = true; }
-  };
-  window.send('ready');
-</script></body></html>`;
 
 export default function LiveMap() {
   const web = useRef<WebView>(null);
@@ -150,6 +119,7 @@ export default function LiveMap() {
         )}
       </View>
       <Screen>
+        <Button title="Past routes: last 7 days" variant="secondary" onPress={() => router.push('/route-history')} />
         <Title>
           {onDuty.length} on duty now · {drivers.length} on the map
         </Title>
