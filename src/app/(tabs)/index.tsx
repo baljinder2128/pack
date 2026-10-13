@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { DutyCard } from '@/components/DutyCard';
+import { SignalWarning } from '@/components/SignalWarning';
 import { Badge, Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Segmented, Title } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDate, formatDateTime, statusColor, statusLabel } from '@/lib/format';
@@ -28,7 +29,10 @@ export default function TripsScreen() {
     <Screen>
       <Stack.Screen options={{ title: isOffice ? 'Trips' : `Hi ${profile?.full_name?.split(' ')[0] ?? ''}` }} />
       {isOffice ? (
-        <Button title="Live map: where are my drivers?" variant="success" onPress={() => router.push('/live-map')} />
+        <>
+          <SignalWarning showMapLink={false} />
+          <Button title="Live map: where are my drivers?" variant="success" onPress={() => router.push('/live-map')} />
+        </>
       ) : (
         <DutyCard />
       )}

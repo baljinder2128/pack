@@ -3,6 +3,7 @@ import { Linking, Platform, Share, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { Button, Card, Empty, ErrorText, Muted, Row, Screen, Title, colors } from '@/components/ui';
+import { SignalWarning, STALE_MS } from '@/components/SignalWarning';
 import { alert } from '@/lib/alert';
 import { formatDateTime, formatTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
@@ -147,9 +148,10 @@ export default function LiveMap() {
           {drivers.length} driver(s) on duty{updated ? ` · updated ${formatTime(updated.toISOString())}` : ''}
         </Muted>
         <ErrorText>{error}</ErrorText>
+        <SignalWarning showMapLink={false} />
         {drivers.length === 0 && <Empty>No drivers are on duty right now.</Empty>}
         {drivers.map((d) => {
-          const stale = Date.now() - new Date(d.recorded_at).getTime() > 10 * 60 * 1000;
+          const stale = Date.now() - new Date(d.recorded_at).getTime() > STALE_MS;
           return (
             <Card key={d.driver_id} onPress={() => select(d)}>
               <Row>
@@ -160,7 +162,7 @@ export default function LiveMap() {
                 Last seen {formatDateTime(d.recorded_at)}
                 {d.speed ? ` · ${Math.round(d.speed * 3.6)} km/h` : ''}
               </Muted>
-              {stale && <Text style={{ color: colors.warning }}>No update for over 10 minutes (no signal or phone off).</Text>}
+              {stale && <Text style={{ color: colors.warning }}>No update for over 5 minutes (app closed, phone locked, or no signal).</Text>}
               <Row>
                 <View style={{ flex: 1 }}>
                   <Button title="Google Maps" variant="secondary" onPress={() => Linking.openURL(mapsLink(d.lat, d.lng))} />

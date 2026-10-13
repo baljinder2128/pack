@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+import { Platform, Text } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
 import { formatTime } from '@/lib/format';
@@ -89,6 +89,12 @@ export function DutyCard() {
           ? `Since ${formatTime(profile.on_duty_since)}. The office can see your location.`
           : 'Your location is not being shared.'}
       </Muted>
+      {profile.on_duty && Platform.OS === 'web' && (
+        <Text style={{ color: colors.warning, fontWeight: '600' }}>
+          Keep this app open on screen while you drive. If you close it or lock the phone, the office can't see you and
+          gets a warning.
+        </Text>
+      )}
       <ErrorText>{error}</ErrorText>
       {profile.on_duty ? (
         <Button title="Go off duty" variant="danger" onPress={goOffDuty} busy={busy} />
