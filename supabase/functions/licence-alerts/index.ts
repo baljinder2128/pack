@@ -136,16 +136,25 @@ Deno.serve(async (req) => {
     const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
     const { data: auth, error: authError } = await admin.auth.getUser(token);
     if (authError || !auth.user) return json({ error: 'Please sign in again' }, 401);
-    const { data: me } = await admin.from('profiles').select('full_name, phone, on_duty, on_duty_since').eq('id', auth.user.id).single();
+    const { data: me } = await admin.from('profiles').select('*').eq('id', auth.user.id).single();
     if (!me?.on_duty_since) return json({ error: 'No shift to report' }, 400);
     const since = me.on_duty_since as string;
     const until = new Date().toISOString();
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date(since));
-    const [trips, sheets, checks] = await Promise.all([
+    const [trips, sheets, checks, bases] = await Promise.all([
       admin.from('trips').select('*').eq('driver_id', auth.user.id).or(`trip_date.eq.${day},started_at.gte.${since},finished_at.gte.${since}`).order('started_at'),
       admin.from('runsheets').select('*').eq('driver_id', auth.user.id).gte('submitted_at', since).order('submitted_at'),
       admin.from('inspections').select('truck_rego, trailer_rego, safe_to_drive, items, created_at').eq('driver_id', auth.user.id).gte('created_at', since),
+      // Night-shift loaded bases and rail bases (0018); empty if that SQL isn't run yet.
+      admin.from('bases').select('*').eq('driver_id', auth.user.id).gte('created_at', since).order('created_at'),
     ]);
+    const night = me.shift_type === 'night';
+    const loaded = (bases.data ?? []).filter((b) => b.kind === 'night_load');
+    const rail = (bases.data ?? []).filter((b) => b.kind === 'rail');
+    const baseList = (list: { base_id: string; load_number?: string; docket_number?: string }[], ref: 'load_number' | 'docket_number') =>
+      list.length
+        ? `<ul style="margin:4px 0 8px;padding-left:18px">${list.map((b) => `<li>${escapeHtml(b.base_id)} - ${ref === 'load_number' ? 'load' : 'docket'} ${escapeHtml(b[ref] ?? '')}</li>`).join('')}</ul>`
+        : '';
     const time = (iso: string | null) =>
       iso ? new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit' }).format(new Date(iso)) : '-';
     const mins = Math.round((Date.parse(until) - Date.parse(since)) / 60000);
@@ -164,12 +173,15 @@ Deno.serve(async (req) => {
     const runsheets = (sheets.data ?? []).filter((s) => s.kind !== 'fuel');
     const faults = (checks.data ?? []).flatMap((c) => (c.items ?? []).filter((i: { ok: boolean }) => !i.ok).map((i: { label: string; note?: string }) => `${c.truck_rego}: ${i.label}${i.note ? ` (${i.note})` : ''}`));
     const html = `
-      <h2 style="margin:0 0 8px">Day report: ${escapeHtml(name)}</h2>
+      <h2 style="margin:0 0 8px">${night ? 'Night' : 'Day'} shift report: ${escapeHtml(name)}</h2>
       <p style="margin:0 0 4px"><b>Date:</b> ${dmy(day)}</p>
+      <p style="margin:0 0 4px"><b>Shift:</b> ${night ? 'Night' : 'Day'}</p>
       <p style="margin:0 0 4px"><b>On duty:</b> ${time(since)} to ${time(until)} (${Math.floor(mins / 60)} h ${mins % 60} min)</p>
       ${me.phone ? `<p style="margin:0 0 4px"><b>Phone:</b> ${escapeHtml(me.phone)}</p>` : ''}
       <h3 style="margin:12px 0 4px">Trips (${trips.data?.length ?? 0})</h3>
       ${tripRows ? `<table style="border-collapse:collapse;font-size:14px"><tr style="text-align:left;background:#15171c;color:#fff"><th style="padding:6px 10px">Trip</th><th style="padding:6px 10px">Truck</th><th style="padding:6px 10px">Time</th><th style="padding:6px 10px">Status</th></tr>${tripRows}</table>` : '<p>No trips.</p>'}
+      ${night || loaded.length ? `<h3 style="margin:12px 0 4px">Bases loaded on night shift: ${loaded.length}</h3>${baseList(loaded, 'load_number')}` : ''}
+      ${rail.length ? `<h3 style="margin:12px 0 4px">Rail bases to Pacific National: ${rail.length}</h3>${baseList(rail, 'docket_number')}` : ''}
       <h3 style="margin:12px 0 4px">Paperwork</h3>
       <p style="margin:0 0 4px"><b>Runsheets sent:</b> ${runsheets.length}</p>
       <p style="margin:0 0 4px"><b>Fuel dockets sent:</b> ${fuel.length}${fuel.length ? ` (${fuel.reduce((a, f) => a + Number(f.litres ?? 0), 0)} L, $${fuel.reduce((a, f) => a + Number(f.fuel_cost ?? 0), 0).toFixed(2)})` : ''}</p>
@@ -177,7 +189,10 @@ Deno.serve(async (req) => {
       ${faults.length ? `<p style="margin:0 0 4px"><b>Faults reported:</b> ${faults.map(escapeHtml).join('; ')}</p>` : ''}
       <p style="margin:8px 0 0;color:#666">Hours still need logging in the app if the driver hasn't done it yet.</p>`;
     try {
-      await sendToOffice(`Day report - ${name} - ${dmy(day)} - ${Math.floor(mins / 60)}h ${mins % 60}m on duty`, html);
+      await sendToOffice(
+        `${night ? 'Night' : 'Day'} report - ${name} - ${dmy(day)} - ${Math.floor(mins / 60)}h ${mins % 60}m on duty${night ? ` - ${loaded.length} bases loaded` : ''}`,
+        html,
+      );
       return json({ ok: true });
     } catch (e) {
       return json({ error: e instanceof Error ? e.message : String(e) }, 502);

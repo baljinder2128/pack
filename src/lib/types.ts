@@ -17,6 +17,7 @@ export type Profile = {
   tracking_consent_at: string | null;
   on_duty: boolean;
   on_duty_since: string | null;
+  shift_type?: 'day' | 'night';
   licence_number: string | null;
   licence_class: string | null;
   licence_state: string | null;

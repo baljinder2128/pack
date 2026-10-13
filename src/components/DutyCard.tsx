@@ -8,7 +8,8 @@ import { clock24, toISODate } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import { callFunction } from '@/lib/drivers';
 import { getSendStatus, onSendStatus, sendCurrentPosition, startTracking, stopTracking, type SendStatus } from '@/lib/tracking';
-import { Button, Card, ErrorText, Muted, Row, Title, colors } from './ui';
+import { BaseLog } from './BaseLog';
+import { Button, Card, ErrorText, Muted, Row, Segmented, Title, colors } from './ui';
 import { alert } from '@/lib/alert';
 
 const ANDROID_APP = 'https://baljinder2128.github.io/pack/download/sbt-truckin.apk';
@@ -20,6 +21,10 @@ export function DutyCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<SendStatus | null>(getSendStatus());
+  const [shift, setShift] = useState<'day' | 'night'>(profile?.shift_type ?? 'day');
+  useEffect(() => {
+    if (profile?.shift_type) setShift(profile.shift_type);
+  }, [profile?.shift_type]);
   useEffect(() => onSendStatus(setSent), []);
 
   // If the app was reinstalled or permissions reset while on duty, restart tracking.
@@ -39,11 +44,13 @@ export function DutyCard() {
     setError(null);
     const { error: updateError } = await supabase
       .from('profiles')
-      .update({ on_duty: true, on_duty_since: new Date().toISOString() })
+      .update({ on_duty: true, on_duty_since: new Date().toISOString(), shift_type: shift })
       .eq('id', profile.id);
     if (updateError) {
       setBusy(false);
-      return setError(updateError.message);
+      return setError(
+        /shift_type/.test(updateError.message) ? `${updateError.message}. The office needs to run the 0018 SQL in Supabase.` : updateError.message,
+      );
     }
     const trackError = await startTracking();
     if (trackError) {
@@ -142,6 +149,19 @@ export function DutyCard() {
       )}
       {profile.on_duty && !sent && <Muted>Waiting for your first location fix…</Muted>}
       <ErrorText>{error}</ErrorText>
+      <Segmented
+        value={shift}
+        onChange={(v) => {
+          setShift(v);
+          // Switching mid-shift (e.g. after first sign-on) saves straight away.
+          if (profile.on_duty) supabase.from('profiles').update({ shift_type: v }).eq('id', profile.id).then(() => refreshProfile());
+        }}
+        options={[
+          { value: 'day', label: 'Day shift' },
+          { value: 'night', label: 'Night shift' },
+        ]}
+      />
+      {profile.on_duty && shift === 'night' && <BaseLog kind="night_load" driverId={profile.id} since={profile.on_duty_since} />}
       {profile.on_duty ? (
         <Button title="Go off duty" variant="danger" onPress={goOffDuty} busy={busy} />
       ) : (

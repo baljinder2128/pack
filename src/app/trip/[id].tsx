@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Platform, Text, View } from 'react-native';
 
+import { BaseLog } from '@/components/BaseLog';
 import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
 import { setArchived } from '@/lib/archive';
 import { callFunction } from '@/lib/drivers';
@@ -218,6 +219,12 @@ export default function TripDetail() {
         <Card>
           <Field label="Trip pay ($, inc GST)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
           <Button title="Save pay" onPress={() => update({ amount: numOrNull(amount) ?? 0 })} busy={busy} />
+        </Card>
+      )}
+
+      {(isMine || isOffice) && (
+        <Card>
+          <BaseLog kind="rail" driverId={trip.driver_id} tripId={trip.id} />
         </Card>
       )}
 

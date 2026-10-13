@@ -212,4 +212,14 @@ check('driver cannot delete a planned load', (await as(D, `delete from trips whe
 check('office deletes a planned load', (await as(O, `delete from trips where id='${pl.id}' returning id`)).length===1);
 const [st] = await as(O, `insert into trips (driver_id,trip_date,truck_rego,pickup,dropoff,status,started_at) values ('${D}','2026-12-01','X1','A','B','in_progress',now()) returning id`);
 check('office cannot delete a started trip', (await as(O, `delete from trips where id='${st.id}' returning id`)).length===0);
+// 0018: night-shift and rail bases.
+check('driver logs a night base', !String(await as(D, `insert into bases (driver_id,kind,base_id,load_number) values ('${D}','night_load','IFRU1234567','L55')`)).startsWith('ERR'));
+check('base ID must be IFRU + 7 digits', String(await as(D, `insert into bases (driver_id,kind,base_id,load_number) values ('${D}','night_load','IFRU123456','L55')`)).startsWith('ERR'));
+check('base ID with 8 digits refused', String(await as(D, `insert into bases (driver_id,kind,base_id,load_number) values ('${D}','night_load','IFRU12345678','L55')`)).startsWith('ERR'));
+check('rail base needs a docket', String(await as(D, `insert into bases (driver_id,kind,base_id) values ('${D}','rail','IFRU7654321')`)).startsWith('ERR'));
+check('driver cannot log for another driver', String(await as(D, `insert into bases (driver_id,kind,base_id,load_number) values ('${O}','night_load','IFRU1111111','L1')`)).startsWith('ERR'));
+check('office sees bases', (await as(O, `select * from bases`)).length >= 1);
+check('driver sets night shift', (await as(D, `update profiles set shift_type='night' where id='${D}' returning shift_type`)).length===1);
+await q(fs.readFileSync(new URL('../migrations/0018_night_shift_bases.sql', import.meta.url), 'utf8'));
+check('0018 can be run twice', true);
 if (failed) process.exit(1);
