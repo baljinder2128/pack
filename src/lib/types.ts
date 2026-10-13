@@ -144,3 +144,15 @@ export type LiveDriver = {
   speed: number | null;
   recorded_at: string;
 };
+
+export type Runsheet = {
+  id: string;
+  driver_id: string;
+  run_date: string;
+  truck_rego: string | null;
+  notes: string | null;
+  photo_paths: string[];
+  submitted_at: string;
+  reviewed_at: string | null;
+  driver?: { full_name: string } | null;
+};

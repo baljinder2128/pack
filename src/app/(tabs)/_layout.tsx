@@ -40,7 +40,7 @@ export default function TabsLayout() {
         headerShadowVisible: false,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Trips', tabBarIcon: icon('bus-outline', 'bus') }} />
+      <Tabs.Screen name="index" options={{ title: 'Trips', tabBarLabel: 'Trips', tabBarIcon: icon('bus-outline', 'bus') }} />
       <Tabs.Screen name="hours" options={{ title: 'Hours', tabBarIcon: icon('time-outline', 'time') }} />
       <Tabs.Screen
         name="inspections"

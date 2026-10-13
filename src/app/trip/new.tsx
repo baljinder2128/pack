@@ -67,7 +67,7 @@ export default function NewTrip() {
   return (
     <Screen>
       {isOffice && <Stack.Screen options={{ title: 'Plan a load' }} />}
-      {isOffice && <Muted>The driver sees this load in their app straight away, under {'Planned & on the road'}.</Muted>}
+      {isOffice && <Muted>The driver sees this load in their app straight away, under Active trips.</Muted>}
       {isOffice && <DriverPicker drivers={drivers} value={driverId} onChange={setDriverId} />}
       <Field label="Date (DD/MM/YYYY)" value={form.trip_date} onChangeText={set('trip_date')} />
       <Field label="Truck rego" value={form.truck_rego} onChangeText={set('truck_rego')} autoCapitalize="characters" />

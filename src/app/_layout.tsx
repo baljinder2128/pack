@@ -29,6 +29,8 @@ function RootStack() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="trip/new" options={{ title: 'New trip', presentation: 'modal' }} />
         <Stack.Screen name="trip/[id]" options={{ title: 'Trip' }} />
+        <Stack.Screen name="runsheet/new" options={{ title: 'Submit runsheet', presentation: 'modal' }} />
+        <Stack.Screen name="runsheet/[id]" options={{ title: 'Runsheet' }} />
         <Stack.Screen name="shift/new" options={{ title: 'Log hours', presentation: 'modal' }} />
         <Stack.Screen name="inspection/new" options={{ title: 'Pre-trip inspection' }} />
         <Stack.Screen name="inspection/[id]" options={{ title: 'Inspection' }} />
