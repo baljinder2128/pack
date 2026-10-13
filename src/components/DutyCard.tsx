@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, Text } from 'react-native';
+import { Linking, Platform, Text } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
 import { formatTime } from '@/lib/format';
@@ -9,6 +9,9 @@ import { supabase } from '@/lib/supabase';
 import { getSendStatus, onSendStatus, sendCurrentPosition, startTracking, stopTracking, type SendStatus } from '@/lib/tracking';
 import { Button, Card, ErrorText, Muted, Row, Title, colors } from './ui';
 import { alert } from '@/lib/alert';
+
+const ANDROID_APP = 'https://baljinder2128.github.io/pack/download/sbt-truckin.apk';
+const isAndroidBrowser = Platform.OS === 'web' && typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
 
 /** Driver's On duty / Off duty switch. Tracking runs only while on duty. */
 export function DutyCard() {
@@ -95,6 +98,12 @@ export function DutyCard() {
         <Text style={{ color: colors.warning, fontWeight: '600' }}>
           Keep this app open on screen while you drive. If you close it or lock the phone, the office can't see you and
           gets a warning.
+        </Text>
+      )}
+      {Platform.OS === 'web' && isAndroidBrowser && (
+        // The Android app keeps tracking with the screen locked; the browser can't.
+        <Text style={{ color: colors.primary, fontWeight: '700' }} onPress={() => Linking.openURL(ANDROID_APP)}>
+          On Android? Install the SBT Truckin app so your location keeps sending with the phone locked. Tap here.
         </Text>
       )}
       {profile.on_duty && sent && (
