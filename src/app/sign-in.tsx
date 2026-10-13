@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Linking, Platform, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, ErrorText, Field, colors } from '@/components/ui';
+import { Button, ErrorText, Field, Muted, colors } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 
 // Accounts are created by the office (More > Drivers), so there is no sign-up here.
@@ -44,6 +44,11 @@ export default function SignIn() {
             >
               Driver? Download the Android app
             </Text>
+          )}
+          {Platform.OS === 'web' && (
+            <Muted>
+              iPhone: open this page in Safari, tap Share, then "Add to Home Screen" to install SBT Trucking.
+            </Muted>
           )}
         </View>
       </KeyboardAvoidingView>

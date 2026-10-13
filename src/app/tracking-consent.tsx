@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { Platform, Text } from 'react-native';
 
 import { Button, Card, ErrorText, Screen, Title } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -58,8 +58,9 @@ export default function TrackingConsent() {
         ))}
       </Card>
       <Text style={{ fontSize: 15 }}>
-        Next your phone will ask for location access. Choose "Allow all the time" (or "Always") so tracking keeps
-        working while you drive.
+        {Platform.OS === 'web'
+          ? 'Next your phone will ask for location access. Choose "Allow". On the web app your location is only sent while the app is open on screen, so keep it open in a cradle while you drive.'
+          : 'Next your phone will ask for location access. Choose "Allow all the time" (or "Always") so tracking keeps working while you drive.'}
       </Text>
       <ErrorText>{error}</ErrorText>
       <Button title="I agree, go on duty" variant="success" onPress={agree} busy={busy} />
