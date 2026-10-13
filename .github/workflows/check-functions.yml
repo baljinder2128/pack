@@ -54,3 +54,9 @@ jobs:
             -H "apikey: sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP" \
             -d '{"day_report":true}' \
             https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/licence-alerts
+      - name: Are night shift and bases live?
+        run: |
+          K=sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP
+          U=https://kovvxlnoezlzzlbavtez.supabase.co
+          curl -s -w "\nbases HTTP %{http_code}\n" "$U/rest/v1/bases?select=id&limit=1" -H "apikey: $K"
+          curl -s -w "\nshift_type HTTP %{http_code}\n" "$U/rest/v1/profiles?select=shift_type&limit=1" -H "apikey: $K"
