@@ -1,12 +1,14 @@
 -- Office can remove reviewed inspections and trips from the lists. Nothing is
 -- deleted: the row is stamped archived_at and stays in the archive for good.
+-- Safe to run more than once.
 alter table public.inspections
-  add column archived_at timestamptz,
-  add column archived_by uuid references public.profiles (id);
+  add column if not exists archived_at timestamptz,
+  add column if not exists archived_by uuid references public.profiles (id);
 alter table public.trips
-  add column archived_at timestamptz,
-  add column archived_by uuid references public.profiles (id);
+  add column if not exists archived_at timestamptz,
+  add column if not exists archived_by uuid references public.profiles (id);
 
+drop policy if exists "inspections: office update" on public.inspections;
 create policy "inspections: office update" on public.inspections
   for update using (public.is_office());
 
@@ -29,9 +31,9 @@ begin
 end;
 $$;
 
-create trigger trips_protect_archive
+create or replace trigger trips_protect_archive
   before update on public.trips
   for each row execute function public.protect_archive();
-create trigger inspections_protect_archive
+create or replace trigger inspections_protect_archive
   before update on public.inspections
   for each row execute function public.protect_archive();
