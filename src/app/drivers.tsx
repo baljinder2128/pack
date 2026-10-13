@@ -3,9 +3,10 @@ import { useState } from 'react';
 
 import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Segmented, Title, colors } from '@/components/ui';
 import { callFunction, listDrivers } from '@/lib/drivers';
-import { formatDate } from '@/lib/format';
+import { formatDate, numOrNull } from '@/lib/format';
 import { licenceStatus } from '@/lib/licence';
 import { money } from '@/lib/pay';
+import { supabase } from '@/lib/supabase';
 import { useFocusQuery } from '@/lib/useQuery';
 
 function tempPassword(): string {
@@ -21,6 +22,7 @@ export default function DriversScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [rate, setRate] = useState('');
   const [password, setPassword] = useState(tempPassword);
   const [role, setRole] = useState<'driver' | 'office'>('driver');
   const [busy, setBusy] = useState(false);
@@ -31,11 +33,21 @@ export default function DriversScreen() {
     setBusy(true);
     setFormError(null);
     try {
-      await callFunction('manage-driver', { action: 'create', full_name: name, email, phone, password, role });
+      const { user_id } = await callFunction<{ ok: true; user_id: string }>('manage-driver', {
+        action: 'create',
+        full_name: name,
+        email,
+        phone,
+        password,
+        role,
+      });
+      const hourly = numOrNull(rate);
+      if (hourly) await supabase.from('profiles').update({ hourly_rate: hourly }).eq('id', user_id);
       setCreated(`Login created. Give ${name} these details:\nEmail: ${email.trim().toLowerCase()}\nPassword: ${password}`);
       setName('');
       setEmail('');
       setPhone('');
+      setRate('');
       setPassword(tempPassword());
       setAdding(false);
       reload();
@@ -74,6 +86,9 @@ export default function DriversScreen() {
           <Field label="Full name" value={name} onChangeText={setName} autoCapitalize="words" />
           <Field label="Email (their username)" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
           <Field label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+          {role === 'driver' && (
+            <Field label="Hourly rate ($, inc GST)" value={rate} onChangeText={setRate} keyboardType="decimal-pad" placeholder="e.g. 45.00" />
+          )}
           <Field label="Temporary password" value={password} onChangeText={setPassword} autoCapitalize="none" />
           <ErrorText>{formError}</ErrorText>
           <Button title="Create login" onPress={create} busy={busy} />
@@ -119,7 +134,7 @@ export default function DriversScreen() {
               <Muted>
                 {d.licence_class ? `${d.licence_class} licence` : 'No licence on file'}
                 {d.licence_expiry ? ` · expires ${formatDate(d.licence_expiry)}` : ''}
-                {d.hourly_rate ? ` · ${money(d.hourly_rate)}/hr` : ''}
+                {d.hourly_rate ? ` · ${money(d.hourly_rate)}/hr inc GST` : ''}
                 {d.abn ? ` · ABN ${d.abn}` : ''}
               </Muted>
             )}

@@ -73,7 +73,7 @@ export default function NewTrip() {
       <Field label="Pickup" value={form.pickup} onChangeText={set('pickup')} />
       <Field label="Drop-off" value={form.dropoff} onChangeText={set('dropoff')} />
       <Field label="Start odometer (km)" value={form.start_odometer} onChangeText={set('start_odometer')} keyboardType="number-pad" />
-      {isOffice && <Field label="Trip pay ($, ex GST)" value={form.amount} onChangeText={set('amount')} keyboardType="decimal-pad" />}
+      {isOffice && <Field label="Trip pay ($, inc GST)" value={form.amount} onChangeText={set('amount')} keyboardType="decimal-pad" />}
       <Field label="Notes" value={form.notes} onChangeText={set('notes')} multiline />
       <ErrorText>{error}</ErrorText>
       <Button title="Save trip" onPress={save} busy={busy} />

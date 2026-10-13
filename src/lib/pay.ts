@@ -81,7 +81,9 @@ type ShiftLike = { shift_date: string; start_at: string; end_at: string; break_m
 /**
  * Weekly RCTI lines: one line per completed trip that has an amount, plus one
  * line per shift paid at the driver's hourly rate (when they have one).
- * GST is 10% when the driver is GST registered.
+ * Every rate and trip amount is GST-inclusive, so the lines add up to the
+ * total paid. When the driver is GST registered, the GST in that total is
+ * 1/11 of it; otherwise there is no GST and the total is all ex-GST.
  */
 export function buildRcti(
   trips: TripLike[],
@@ -117,9 +119,9 @@ export function buildRcti(
       });
     }
   }
-  const subtotal = round2(lines.reduce((sum, l) => sum + l.amount, 0));
-  const gst = gstRegistered ? round2(subtotal * 0.1) : 0;
-  return { lines, hours: round2(hours), subtotal, gst, total: round2(subtotal + gst) };
+  const total = round2(lines.reduce((sum, l) => sum + l.amount, 0));
+  const gst = gstRegistered ? round2(total / 11) : 0;
+  return { lines, hours: round2(hours), subtotal: round2(total - gst), gst, total };
 }
 
 export function money(n: number): string {

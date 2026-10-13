@@ -133,9 +133,9 @@ export default function RctiScreen() {
               {formatDate(start)} – {formatDate(weekEnd(start))}
             </Muted>
             <Text style={{ fontSize: 16 }}>Hours: {w.totals.hours}</Text>
-            <Text style={{ fontSize: 16 }}>Subtotal: {money(w.totals.subtotal)}</Text>
-            <Text style={{ fontSize: 16 }}>GST: {money(w.totals.gst)}</Text>
-            <Text style={{ fontSize: 18, fontWeight: '800' }}>Total: {money(w.totals.total)}</Text>
+            <Text style={{ fontSize: 16 }}>Subtotal (ex GST): {money(w.totals.subtotal)}</Text>
+            <Text style={{ fontSize: 16 }}>GST included: {money(w.totals.gst)}</Text>
+            <Text style={{ fontSize: 18, fontWeight: '800' }}>Total (inc GST): {money(w.totals.total)}</Text>
             {w.issued ? (
               <Muted>
                 RCTI #{w.issued.number} issued {formatDateTime(w.issued.issued_at)}

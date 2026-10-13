@@ -76,13 +76,13 @@ export function rctiHtml(opts: {
     </div>
   </div>
   <table>
-    <thead><tr><th>Date</th><th>Description</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">Amount</th></tr></thead>
+    <thead><tr><th>Date</th><th>Description</th><th class="n">Qty</th><th class="n">Rate${driver.gst_registered ? ' (inc GST)' : ''}</th><th class="n">Amount${driver.gst_registered ? ' (inc GST)' : ''}</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="5">No paid work this period.</td></tr>'}</tbody>
   </table>
   <table class="totals">
     <tr><td>Total hours</td><td class="n">${totals.hours}</td></tr>
     <tr><td>Subtotal (ex GST)</td><td class="n">${money(totals.subtotal)}</td></tr>
-    <tr><td>GST${driver.gst_registered ? ' (10%)' : ' (supplier not registered)'}</td><td class="n">${money(totals.gst)}</td></tr>
+    <tr><td>GST${driver.gst_registered ? ' (included, 1/11)' : ' (supplier not registered)'}</td><td class="n">${money(totals.gst)}</td></tr>
     <tr class="grand"><td>Total payable</td><td class="n">${money(totals.total)}</td></tr>
   </table>
   <p class="agreement">${esc(company.rcti_agreement)}</p>

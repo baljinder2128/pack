@@ -24,7 +24,7 @@ test('rejects bad times', () => {
   assert.equal(shiftTimes('2026-10-12', '25:00', '06:00'), null);
 });
 
-test('builds RCTI totals with GST', () => {
+test('builds RCTI totals from GST-inclusive rates', () => {
   const t = shiftTimes('2026-10-13', '06:00', '16:00')!;
   const r = buildRcti(
     [
@@ -37,9 +37,10 @@ test('builds RCTI totals with GST', () => {
   );
   assert.equal(r.lines.length, 2);
   assert.equal(r.hours, 9.5);
-  assert.equal(r.subtotal, 830);
-  assert.equal(r.gst, 83);
-  assert.equal(r.total, 913);
+  // 450 trip + 9.5 h at $40, all GST-inclusive.
+  assert.equal(r.total, 830);
+  assert.equal(r.gst, 75.45);
+  assert.equal(r.subtotal, 754.55);
 });
 
 test('no GST when driver is not registered', () => {

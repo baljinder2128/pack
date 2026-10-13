@@ -120,7 +120,7 @@ export default function TripDetail() {
         </Text>
         <Text>Started: {formatDateTime(trip.started_at)}</Text>
         <Text>Finished: {formatDateTime(trip.finished_at)}</Text>
-        {isOffice && <Text>Pay: {money(trip.amount)} ex GST</Text>}
+        {isOffice && <Text>Pay: {money(trip.amount)} inc GST</Text>}
         {trip.notes && <Muted>{trip.notes}</Muted>}
       </Card>
 
@@ -158,7 +158,7 @@ export default function TripDetail() {
 
       {isOffice && (
         <Card>
-          <Field label="Trip pay ($, ex GST)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
+          <Field label="Trip pay ($, inc GST)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
           <Button title="Save pay" onPress={() => update({ amount: numOrNull(amount) ?? 0 })} busy={busy} />
         </Card>
       )}

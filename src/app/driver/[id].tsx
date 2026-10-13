@@ -140,7 +140,8 @@ export default function DriverScreen() {
       )}
       <Field label="Full name" value={form.full_name} onChangeText={set('full_name')} />
       <Field label="Phone" value={form.phone} onChangeText={set('phone')} keyboardType="phone-pad" />
-      <Field label="Hourly rate ($, ex GST)" value={form.hourly_rate} onChangeText={set('hourly_rate')} keyboardType="decimal-pad" />
+      <Field label="Hourly rate ($, inc GST)" value={form.hourly_rate} onChangeText={set('hourly_rate')} keyboardType="decimal-pad" />
+      <Muted>A new rate is used for RCTIs issued from now on. RCTIs already issued keep their amounts.</Muted>
       <Field label="Start date (YYYY-MM-DD)" value={form.start_date} onChangeText={set('start_date')} />
       <Title>Licence</Title>
       <Field label="Licence number" value={form.licence_number} onChangeText={set('licence_number')} autoCapitalize="characters" />
