@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { Alert, Platform, Text, View } from 'react-native';
 
 import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
 import { setArchived } from '@/lib/archive';
@@ -102,6 +102,26 @@ export default function TripDetail() {
     });
   }
 
+  async function remove() {
+    const ok =
+      Platform.OS === 'web'
+        ? window.confirm('Delete this planned load? The driver will no longer see it.')
+        : await new Promise<boolean>((res) =>
+            Alert.alert('Delete this planned load?', 'The driver will no longer see it.', [
+              { text: 'Cancel', style: 'cancel', onPress: () => res(false) },
+              { text: 'Delete', style: 'destructive', onPress: () => res(true) },
+            ]),
+          );
+    if (!ok) return;
+    setBusy(true);
+    setActionError(null);
+    const { data, error: e } = await supabase.from('trips').delete().eq('id', id).select('id');
+    setBusy(false);
+    if (e) return setActionError(e.message);
+    if (!data?.length) return setActionError("Couldn't delete it. Run the 0017 SQL in Supabase first. Started trips can't be deleted.");
+    router.back();
+  }
+
   async function archive() {
     if (!trip || !session) return;
     try {
@@ -157,6 +177,16 @@ export default function TripDetail() {
         />
       )}
 
+      {trip.status === 'planned' && isOffice && !trip.started_at && (
+        <Row>
+          <View style={{ flex: 1 }}>
+            <Button title="Change load" variant="secondary" onPress={() => router.push({ pathname: '/trip/new', params: { id: trip.id } })} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button title="Delete load" variant="danger" onPress={remove} busy={busy} />
+          </View>
+        </Row>
+      )}
       {trip.status === 'planned' && isMine && !trip.accepted_at && (
         <Button title="Accept this load" onPress={accept} busy={busy} />
       )}

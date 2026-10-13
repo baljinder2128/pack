@@ -59,8 +59,9 @@ await as(D, `update trips set archived_at=now() where id='${tripD}'`);
 check('driver cannot archive a trip', (await db.query(`select archived_at from trips where id='${tripD}'`)).rows[0].archived_at === null);
 await as(O, `update trips set archived_at=now(), archived_by='${O}' where id='${tripD}'`);
 check('office archives a trip', (await db.query(`select archived_at from trips where id='${tripD}'`)).rows[0].archived_at !== null);
+await db.query(`update trips set status='in_progress', started_at=now() where id='${tripD}'`);
 await as(O, `delete from trips where id='${tripD}'`);
-check('trips cannot be deleted, even by office', (await db.query(`select 1 from trips where id='${tripD}'`)).rows.length === 1);
+check('started trips cannot be deleted, even by office', (await db.query(`select 1 from trips where id='${tripD}'`)).rows.length === 1);
 await as(O, `update inspections set archived_at=now(), archived_by='${O}'`);
 check('office archives an inspection', (await db.query(`select count(*)::int n from inspections where archived_at is not null`)).rows[0].n === 1);
 check('inspections cannot be deleted', (await as(O, `delete from inspections returning *`)).length === 0);
@@ -204,4 +205,11 @@ check('driver cannot add a place', String(await as(D, `insert into places (name)
 check('driver cannot remove a place', (await as(D, `update places set active=false returning *`)).length===0);
 await q(fs.readFileSync(new URL('../migrations/0016_places.sql', import.meta.url), 'utf8'));
 check('0016 can be run twice', true);
+// 0017: office deletes planned loads only.
+await q(fs.readFileSync(new URL('../migrations/0017_delete_planned_loads.sql', import.meta.url), 'utf8'));
+const [pl] = await as(O, `insert into trips (driver_id,trip_date,truck_rego,pickup,dropoff) values ('${D}','2026-12-01','X1','A','B') returning id`);
+check('driver cannot delete a planned load', (await as(D, `delete from trips where id='${pl.id}' returning id`)).length===0);
+check('office deletes a planned load', (await as(O, `delete from trips where id='${pl.id}' returning id`)).length===1);
+const [st] = await as(O, `insert into trips (driver_id,trip_date,truck_rego,pickup,dropoff,status,started_at) values ('${D}','2026-12-01','X1','A','B','in_progress',now()) returning id`);
+check('office cannot delete a started trip', (await as(O, `delete from trips where id='${st.id}' returning id`)).length===0);
 if (failed) process.exit(1);
