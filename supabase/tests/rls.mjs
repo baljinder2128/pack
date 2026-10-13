@@ -196,4 +196,12 @@ check('office sets a trailer fleet number', !String(await as(O, `insert into veh
 check('driver reads fleet numbers', (await as(D, `select fleet_number from vehicles where rego='TR55'`))[0]?.fleet_number==='12');
 await q(fs.readFileSync(new URL('../migrations/0015_fleet_numbers.sql', import.meta.url), 'utf8'));
 check('0015 can be run twice', true);
+// 0016: customer places.
+await q(fs.readFileSync(new URL('../migrations/0016_places.sql', import.meta.url), 'utf8'));
+check('office adds a place', !String(await as(O, `insert into places (name,address) values ('Visy Smithfield','12 Long St')`)).startsWith('ERR'));
+check('driver reads places', (await as(D, `select * from places`)).length===1);
+check('driver cannot add a place', String(await as(D, `insert into places (name) values ('Hack')`)).startsWith('ERR'));
+check('driver cannot remove a place', (await as(D, `update places set active=false returning *`)).length===0);
+await q(fs.readFileSync(new URL('../migrations/0016_places.sql', import.meta.url), 'utf8'));
+check('0016 can be run twice', true);
 if (failed) process.exit(1);

@@ -77,6 +77,7 @@ export default function MoreScreen() {
             ? ([
                 { icon: 'people-outline', label: 'Drivers & logins', hint: 'Add drivers, pay rates and office staff', onPress: () => router.push('/drivers') },
                 { icon: 'map-outline', label: 'Live map', hint: 'Drivers on duty now and past routes', onPress: () => router.push('/live-map') },
+                { icon: 'location-outline', label: 'Customers & places', hint: 'Pick-up and drop-off places drivers choose from', onPress: () => router.push('/places') },
                 { icon: 'bus-outline', label: 'Trucks & trailers', hint: 'Regos drivers pick from', onPress: () => router.push('/fleet') },
                 { icon: 'business-outline', label: 'Company details', hint: 'Shown on RCTIs and payslips', onPress: () => router.push('/company') },
               ] as MenuItem[])

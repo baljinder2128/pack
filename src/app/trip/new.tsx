@@ -2,6 +2,7 @@ import { Stack, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 import { DriverPicker } from '@/components/DriverPicker';
+import { CustomerPicker, PlacePicker } from '@/components/PlacePicker';
 import { RegoPicker } from '@/components/RegoPicker';
 import { Button, ErrorText, Field, Muted, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -81,10 +82,16 @@ export default function NewTrip() {
         onChangeText={set('visy_trailer')}
         autoCapitalize="characters"
       />
-      <Field label="Customer" value={form.customer} onChangeText={set('customer')} />
+      <CustomerPicker value={form.customer} onChange={set('customer')} />
       <Field label="Job / docket number" value={form.job_ref} onChangeText={set('job_ref')} />
-      <Field label="Pickup" value={form.pickup} onChangeText={set('pickup')} />
-      <Field label="Drop-off" value={form.dropoff} onChangeText={set('dropoff')} />
+      <PlacePicker
+        use="pickup"
+        label="Pickup"
+        value={form.pickup}
+        onChange={set('pickup')}
+        onPick={(p) => setForm((f) => (f.customer.trim() ? f : { ...f, customer: p.name }))}
+      />
+      <PlacePicker use="dropoff" label="Drop-off" value={form.dropoff} onChange={set('dropoff')} />
       <Field label="Start odometer (km)" value={form.start_odometer} onChangeText={set('start_odometer')} keyboardType="number-pad" />
       <Field label="Notes" value={form.notes} onChangeText={set('notes')} multiline />
       <ErrorText>{error}</ErrorText>
