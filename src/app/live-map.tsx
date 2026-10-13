@@ -55,12 +55,18 @@ export default function LiveMap() {
   const [focus, setFocus] = useState<[number, number] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updated, setUpdated] = useState<Date | null>(null);
+  // Everyone on duty, including drivers whose phone hasn't sent a location yet.
+  const [onDuty, setOnDuty] = useState<{ id: string; full_name: string; phone: string | null; on_duty_since: string | null }[]>([]);
 
   useEffect(() => {
     let alive = true;
     async function load() {
-      const { data, error } = await supabase.from('live_drivers').select('*').order('full_name');
+      const [{ data, error }, duty] = await Promise.all([
+        supabase.from('live_drivers').select('*').order('full_name'),
+        supabase.from('profiles').select('id, full_name, phone, on_duty_since').eq('on_duty', true).eq('active', true).order('full_name'),
+      ]);
       if (!alive) return;
+      if (duty.data) setOnDuty(duty.data);
       if (error) setError(error.message);
       else {
         setDrivers((data ?? []) as LiveDriver[]);
@@ -144,12 +150,29 @@ export default function LiveMap() {
         )}
       </View>
       <Screen>
-        <Muted>
-          {drivers.length} driver(s) on duty{updated ? ` · updated ${formatTime(updated.toISOString())}` : ''}
-        </Muted>
+        <Title>
+          {onDuty.length} on duty now · {drivers.length} on the map
+        </Title>
+        {updated && <Muted>Updated {formatTime(updated.toISOString())}, refreshes every 30 seconds</Muted>}
         <ErrorText>{error}</ErrorText>
         <SignalWarning showMapLink={false} />
-        {drivers.length === 0 && <Empty>No drivers are on duty right now.</Empty>}
+        {onDuty.length === 0 && <Empty>No drivers are on duty right now.</Empty>}
+        {onDuty
+          .filter((p) => !drivers.some((d) => d.driver_id === p.id))
+          .map((p) => (
+            <Card key={p.id}>
+              <Row>
+                <Title>{p.full_name}</Title>
+                <Text style={{ color: colors.warning, marginLeft: 'auto', fontWeight: '600' }}>No location yet</Text>
+              </Row>
+              <Muted>On duty since {formatDateTime(p.on_duty_since)}. Their phone hasn't sent a location since then.</Muted>
+              {p.phone && (
+                <Text style={{ color: colors.primary }} onPress={() => Linking.openURL(`tel:${p.phone}`)}>
+                  Call {p.phone}
+                </Text>
+              )}
+            </Card>
+          ))}
         {drivers.map((d) => {
           const stale = Date.now() - new Date(d.recorded_at).getTime() > STALE_MS;
           return (

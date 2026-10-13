@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Segmented, Title, colors } from '@/components/ui';
 import { callFunction, listDrivers } from '@/lib/drivers';
@@ -134,6 +134,11 @@ export default function DriversScreen() {
           <Title>
             {activeDrivers.length} driver{activeDrivers.length === 1 ? '' : 's'} · {office.length} office
           </Title>
+          {activeDrivers.some((d) => d.on_duty) && (
+            <Text style={{ color: colors.success, fontWeight: '700' }} onPress={() => router.push('/live-map')}>
+              {activeDrivers.filter((d) => d.on_duty).length} on duty now: {activeDrivers.filter((d) => d.on_duty).map((d) => d.full_name).join(', ')} (open live map)
+            </Text>
+          )}
           <Muted>
             {removed.length} removed
             {expiring ? ` · ${expiring} licence${expiring === 1 ? '' : 's'} expired or expiring in 30 days` : ''}
@@ -146,7 +151,7 @@ export default function DriversScreen() {
           {/* Office first: side by side on a wide screen, stacked on a phone. */}
           {[
             { title: `Office (${office.length})`, people: office },
-            { title: `Drivers (${activeDrivers.length})`, people: activeDrivers },
+            { title: `Drivers (${activeDrivers.length})`, people: [...activeDrivers].sort((a, b) => Number(b.on_duty) - Number(a.on_duty)) },
           ].map((col) => (
             <View key={col.title} style={{ flexGrow: 1, flexBasis: 320, gap: 12 }}>
               <Title>{col.title}</Title>
