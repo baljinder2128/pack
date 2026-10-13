@@ -29,8 +29,11 @@ async function sharePdf(html: string, fileName: string) {
 
 export default function RctiScreen() {
   const { profile, isOffice } = useAuth();
-  // Default to last week: RCTIs are done once the week has finished.
-  const [start, setStart] = useState(weekStart(toISODate(new Date(Date.now() - 7 * 86400000))));
+  // Office starts on last week (RCTIs are done once the week has finished);
+  // drivers start on this week, so their pay goes up as they log hours.
+  const [start, setStart] = useState(
+    weekStart(toISODate(new Date(Date.now() - (isOffice ? 7 : 0) * 86400000))),
+  );
   const [driverId, setDriverId] = useState<string | null>(isOffice ? null : profile?.id ?? null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);

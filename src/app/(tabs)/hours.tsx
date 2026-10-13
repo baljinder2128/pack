@@ -6,7 +6,7 @@ import { WeekNav } from '@/components/WeekNav';
 import { Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDate, formatTime } from '@/lib/format';
-import { addDays, round2, shiftHours, toISODate, weekStart } from '@/lib/pay';
+import { addDays, money, round2, shiftHours, toISODate, weekStart } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import type { Shift } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
@@ -20,18 +20,22 @@ export default function HoursScreen() {
     return unwrap(
       await supabase
         .from('shifts')
-        .select('*, driver:profiles!shifts_driver_id_fkey(full_name)')
+        .select('*, driver:profiles!shifts_driver_id_fkey(full_name, hourly_rate)')
         .gte('shift_date', start)
         .lte('shift_date', addDays(start, 6)) // include Sunday so nothing logged is hidden
         .order('start_at'),
-    ) as Shift[];
+    ) as (Shift & { driver: { full_name: string; hourly_rate: number | null } | null })[];
   }, [start]);
 
   // Office sees everyone's hours, so total them per driver.
-  const totals = new Map<string, { name: string; hours: number }>();
+  // Pay goes up as soon as hours are logged: hours x the driver's hourly rate.
+  const rate = (s: { driver?: { hourly_rate: number | null } | null }) => Number(s.driver?.hourly_rate) || 0;
+  const totals = new Map<string, { name: string; hours: number; pay: number }>();
   for (const s of data ?? []) {
-    const t = totals.get(s.driver_id) ?? { name: s.driver?.full_name ?? '', hours: 0 };
-    t.hours = round2(t.hours + shiftHours(s.start_at, s.end_at, s.break_minutes));
+    const t = totals.get(s.driver_id) ?? { name: s.driver?.full_name ?? '', hours: 0, pay: 0 };
+    const h = shiftHours(s.start_at, s.end_at, s.break_minutes);
+    t.hours = round2(t.hours + h);
+    t.pay = round2(t.pay + h * rate(s));
     totals.set(s.driver_id, t);
   }
 
@@ -61,8 +65,10 @@ export default function HoursScreen() {
             <Text key={t.name} style={{ fontSize: 16 }}>
               {isOffice ? `${t.name}: ` : ''}
               <Text style={{ fontWeight: '700' }}>{t.hours} hrs</Text>
+              {t.pay > 0 ? ` · ${money(t.pay)}` : ''}
             </Text>
           ))}
+          <Muted>Pay for hours so far this week. Trips and the full pay are on the {isOffice ? 'Pay' : 'My pay'} tab.</Muted>
         </Card>
       )}
       {loading && !data ? (
@@ -74,6 +80,7 @@ export default function HoursScreen() {
               <Title>{formatDate(s.shift_date)}</Title>
               <Text style={{ marginLeft: 'auto', fontWeight: '700', color: colors.primary }}>
                 {shiftHours(s.start_at, s.end_at, s.break_minutes)} hrs
+                {rate(s) > 0 ? ` · ${money(round2(shiftHours(s.start_at, s.end_at, s.break_minutes) * rate(s)))}` : ''}
               </Text>
             </Row>
             <Muted>
