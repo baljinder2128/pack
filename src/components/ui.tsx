@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -95,6 +96,71 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput placeholderTextColor={colors.muted} style={[styles.input, props.multiline && { minHeight: 80 }]} {...props} />
+    </View>
+  );
+}
+
+/** A dropdown: tap to open a list and pick one option. */
+export function Select({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder = 'Choose…',
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = options.find((o) => o.value === value);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        style={[styles.input, { flexDirection: 'row', alignItems: 'center' }]}
+      >
+        <Text style={{ flex: 1, fontSize: 16, color: current || value ? colors.text : colors.muted }}>
+          {current?.label ?? (value || placeholder)}
+        </Text>
+        <Text style={{ color: colors.muted }}>▼</Text>
+      </Pressable>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable
+          onPress={() => setOpen(false)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 24 }}
+        >
+          <View style={{ backgroundColor: colors.card, borderRadius: 12, maxHeight: '80%', width: '100%', maxWidth: 420, alignSelf: 'center' }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', padding: 16, color: colors.text }}>{label}</Text>
+            <ScrollView>
+              {[{ value: '', label: 'None' }, ...options].map((o) => (
+                <Pressable
+                  key={o.value || 'none'}
+                  onPress={() => {
+                    onChange(o.value);
+                    setOpen(false);
+                  }}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.border,
+                    backgroundColor: o.value === value ? colors.primary + '14' : undefined,
+                  }}
+                >
+                  <Text style={{ fontSize: 16, color: o.value ? colors.text : colors.muted, fontWeight: o.value === value ? '700' : '400' }}>
+                    {o.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

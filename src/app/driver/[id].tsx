@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
-import { Button, Card, ErrorText, Field, Loading, Muted, Screen, Segmented, Title, Toggle } from '@/components/ui';
+import { Button, Card, ErrorText, Field, Loading, Muted, Screen, Segmented, Select, Title, Toggle } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { callFunction } from '@/lib/drivers';
 import { numOrNull } from '@/lib/format';
+import { LICENCE_CLASSES, STATES } from '@/lib/licence';
 import { isISODate } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Role } from '@/lib/types';
@@ -143,8 +144,8 @@ export default function DriverScreen() {
       <Field label="Start date (YYYY-MM-DD)" value={form.start_date} onChangeText={set('start_date')} />
       <Title>Licence</Title>
       <Field label="Licence number" value={form.licence_number} onChangeText={set('licence_number')} autoCapitalize="characters" />
-      <Field label="Class (e.g. HR, HC, MC)" value={form.licence_class} onChangeText={set('licence_class')} autoCapitalize="characters" />
-      <Field label="State (e.g. VIC, NSW)" value={form.licence_state} onChangeText={set('licence_state')} autoCapitalize="characters" />
+      <Select label="Licence class" value={form.licence_class} options={LICENCE_CLASSES} onChange={set('licence_class')} />
+      <Select label="State" value={form.licence_state} options={STATES} onChange={set('licence_state')} />
       <Field label="Expiry (YYYY-MM-DD)" value={form.licence_expiry} onChangeText={set('licence_expiry')} />
       <Title>Business (for RCTI)</Title>
       <Field label="Business name" value={form.business_name} onChangeText={set('business_name')} />
