@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Tabs from 'expo-router/js-tabs';
 import type { ComponentProps } from 'react';
 import { Image, Text, View, type ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -27,13 +28,21 @@ function BrandTitle({ children }: { children: string }) {
 
 export default function TabsLayout() {
   const { isOffice } = useAuth();
+  // Keep the icons and labels clear of the phone's bottom edge and home bar.
+  const { bottom } = useSafeAreaInsets();
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: '#8a8f9c',
         tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
-        tabBarStyle: { borderTopColor: colors.border, backgroundColor: colors.card },
+        tabBarStyle: {
+          borderTopColor: colors.border,
+          backgroundColor: colors.card,
+          height: 64 + bottom,
+          paddingTop: 8,
+          paddingBottom: bottom + 10,
+        },
         headerTitleAlign: 'left',
         headerTitle: ({ children }) => <BrandTitle>{children}</BrandTitle>,
         headerStyle: { backgroundColor: colors.card, borderBottomWidth: 3, borderBottomColor: colors.primary },
