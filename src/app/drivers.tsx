@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { View } from 'react-native';
 
 import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Segmented, Title, colors } from '@/components/ui';
 import { callFunction, listDrivers } from '@/lib/drivers';
@@ -7,6 +8,7 @@ import { formatDate, numOrNull } from '@/lib/format';
 import { licenceStatus } from '@/lib/licence';
 import { money } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
+import type { Profile } from '@/lib/types';
 import { useFocusQuery } from '@/lib/useQuery';
 
 function tempPassword(): string {
@@ -62,6 +64,28 @@ export default function DriversScreen() {
   const removed = (data ?? []).filter((d) => !d.active);
   const activeDrivers = active.filter((d) => d.role === 'driver');
   const office = active.filter((d) => d.role === 'office');
+
+  const personCard = (d: Profile) => {
+    const lic = d.role === 'driver' ? licenceStatus(d.licence_expiry) : null;
+    return (
+      <Card key={d.id} onPress={() => router.push(`/driver/${d.id}`)}>
+        <Row>
+          <Title>{d.full_name || 'Unnamed'}</Title>
+          {d.on_duty && <Badge label="On duty" color={colors.success} />}
+          {lic && <Badge label={lic.label} color={lic.color} />}
+        </Row>
+        <Muted>{[d.phone, d.email].filter(Boolean).join(' · ')}</Muted>
+        {d.role === 'driver' && (
+          <Muted>
+            {d.licence_class ? `${d.licence_class} licence` : 'No licence on file'}
+            {d.licence_expiry ? ` · expires ${formatDate(d.licence_expiry)}` : ''}
+            {d.hourly_rate ? ` · ${money(d.hourly_rate)}/hr${d.pay_type === 'tfn' ? '' : ' inc GST'}` : ''}
+            {d.pay_type === 'tfn' ? ' · TFN employee' : d.abn ? ` · ABN ${d.abn}` : ''}
+          </Muted>
+        )}
+      </Card>
+    );
+  };
   const expiring = activeDrivers.filter((d) => licenceStatus(d.licence_expiry)).length;
 
   return (
@@ -117,30 +141,21 @@ export default function DriversScreen() {
           <Muted>Tap a person to see or change their details.</Muted>
         </Card>
       )}
-      {active.map((d) => {
-        const lic = licenceStatus(d.licence_expiry);
-        return (
-          <Card key={d.id} onPress={() => router.push(`/driver/${d.id}`)}>
-            <Row>
-              <Title>{d.full_name || 'Unnamed'}</Title>
-              {d.role === 'office' && <Badge label="Office" color={colors.primary} />}
-              {d.on_duty && <Badge label="On duty" color={colors.success} />}
-              {lic && <Badge label={lic.label} color={lic.color} />}
-            </Row>
-            <Muted>
-              {[d.phone, d.email].filter(Boolean).join(' · ')}
-            </Muted>
-            {d.role === 'driver' && (
-              <Muted>
-                {d.licence_class ? `${d.licence_class} licence` : 'No licence on file'}
-                {d.licence_expiry ? ` · expires ${formatDate(d.licence_expiry)}` : ''}
-                {d.hourly_rate ? ` · ${money(d.hourly_rate)}/hr${d.pay_type === 'tfn' ? '' : ' inc GST'}` : ''}
-                {d.pay_type === 'tfn' ? ' · TFN employee' : d.abn ? ` · ABN ${d.abn}` : ''}
-              </Muted>
-            )}
-          </Card>
-        );
-      })}
+      {data && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' }}>
+          {/* Office first: side by side on a wide screen, stacked on a phone. */}
+          {[
+            { title: `Office (${office.length})`, people: office },
+            { title: `Drivers (${activeDrivers.length})`, people: activeDrivers },
+          ].map((col) => (
+            <View key={col.title} style={{ flexGrow: 1, flexBasis: 320, gap: 12 }}>
+              <Title>{col.title}</Title>
+              {col.people.length === 0 && <Muted>None yet.</Muted>}
+              {col.people.map(personCard)}
+            </View>
+          ))}
+        </View>
+      )}
       {removed.length > 0 && <Title>Removed</Title>}
       {removed.map((d) => (
         <Card key={d.id} onPress={() => router.push(`/driver/${d.id}`)}>
