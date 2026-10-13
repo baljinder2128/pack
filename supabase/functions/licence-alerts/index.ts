@@ -15,6 +15,8 @@
 //   { runsheet_id }  -> a driver submitted their end-of-day runsheet or a fuel docket:
 //                       email the photos to the office. Needs the driver's sign-in.
 //   { trip_id }      -> a driver accepted a load the office planned: tell the office.
+//   { day_report }   -> a driver went off duty: email the office their day (time on duty,
+//                       trips, runsheets, fuel dockets, pre-trip checks). Needs the driver's sign-in.
 //
 // The daily check also deletes the photos of runsheets, fuel dockets and inspections
 // that were checked or archived more than 2 months ago. The records themselves stay.
@@ -127,8 +129,60 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false },
   });
-  const { renewal_id, runsheet_id, trip_id } = await req.json().catch(() => ({}));
+  const { renewal_id, runsheet_id, trip_id, day_report } = await req.json().catch(() => ({}));
   office = await officeEmail(admin);
+
+  if (day_report) {
+    const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+    const { data: auth, error: authError } = await admin.auth.getUser(token);
+    if (authError || !auth.user) return json({ error: 'Please sign in again' }, 401);
+    const { data: me } = await admin.from('profiles').select('full_name, phone, on_duty, on_duty_since').eq('id', auth.user.id).single();
+    if (!me?.on_duty_since) return json({ error: 'No shift to report' }, 400);
+    const since = me.on_duty_since as string;
+    const until = new Date().toISOString();
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date(since));
+    const [trips, sheets, checks] = await Promise.all([
+      admin.from('trips').select('*').eq('driver_id', auth.user.id).or(`trip_date.eq.${day},started_at.gte.${since},finished_at.gte.${since}`).order('started_at'),
+      admin.from('runsheets').select('*').eq('driver_id', auth.user.id).gte('submitted_at', since).order('submitted_at'),
+      admin.from('inspections').select('truck_rego, trailer_rego, safe_to_drive, items, created_at').eq('driver_id', auth.user.id).gte('created_at', since),
+    ]);
+    const time = (iso: string | null) =>
+      iso ? new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit' }).format(new Date(iso)) : '-';
+    const mins = Math.round((Date.parse(until) - Date.parse(since)) / 60000);
+    const name = me.full_name ?? 'A driver';
+    const cell = 'padding:6px 10px;border-bottom:1px solid #eee';
+    const tripRows = (trips.data ?? [])
+      .map((t) => {
+        const km = t.start_odometer && t.end_odometer ? `${t.end_odometer - t.start_odometer} km` : '';
+        return `<tr><td style="${cell}">${escapeHtml(t.pickup)} → ${escapeHtml(t.dropoff)}<br>${escapeHtml([t.customer, t.job_ref].filter(Boolean).join(' · '))}</td>
+          <td style="${cell}">${escapeHtml([t.truck_rego, t.trailer_rego].filter(Boolean).join(' / '))}</td>
+          <td style="${cell}">${time(t.started_at)} - ${time(t.finished_at)}<br>${km}</td>
+          <td style="${cell}">${escapeHtml(t.status === 'completed' ? 'Done' : t.status === 'in_progress' ? 'Not finished' : 'Not started')}</td></tr>`;
+      })
+      .join('');
+    const fuel = (sheets.data ?? []).filter((s) => s.kind === 'fuel');
+    const runsheets = (sheets.data ?? []).filter((s) => s.kind !== 'fuel');
+    const faults = (checks.data ?? []).flatMap((c) => (c.items ?? []).filter((i: { ok: boolean }) => !i.ok).map((i: { label: string; note?: string }) => `${c.truck_rego}: ${i.label}${i.note ? ` (${i.note})` : ''}`));
+    const html = `
+      <h2 style="margin:0 0 8px">Day report: ${escapeHtml(name)}</h2>
+      <p style="margin:0 0 4px"><b>Date:</b> ${dmy(day)}</p>
+      <p style="margin:0 0 4px"><b>On duty:</b> ${time(since)} to ${time(until)} (${Math.floor(mins / 60)} h ${mins % 60} min)</p>
+      ${me.phone ? `<p style="margin:0 0 4px"><b>Phone:</b> ${escapeHtml(me.phone)}</p>` : ''}
+      <h3 style="margin:12px 0 4px">Trips (${trips.data?.length ?? 0})</h3>
+      ${tripRows ? `<table style="border-collapse:collapse;font-size:14px"><tr style="text-align:left;background:#15171c;color:#fff"><th style="padding:6px 10px">Trip</th><th style="padding:6px 10px">Truck</th><th style="padding:6px 10px">Time</th><th style="padding:6px 10px">Status</th></tr>${tripRows}</table>` : '<p>No trips.</p>'}
+      <h3 style="margin:12px 0 4px">Paperwork</h3>
+      <p style="margin:0 0 4px"><b>Runsheets sent:</b> ${runsheets.length}</p>
+      <p style="margin:0 0 4px"><b>Fuel dockets sent:</b> ${fuel.length}${fuel.length ? ` (${fuel.reduce((a, f) => a + Number(f.litres ?? 0), 0)} L, $${fuel.reduce((a, f) => a + Number(f.fuel_cost ?? 0), 0).toFixed(2)})` : ''}</p>
+      <p style="margin:0 0 4px"><b>Pre-trip checks:</b> ${checks.data?.length ?? 0}${(checks.data ?? []).some((c) => !c.safe_to_drive) ? ' <b style="color:#c0262d">(one marked NOT safe to drive)</b>' : ''}</p>
+      ${faults.length ? `<p style="margin:0 0 4px"><b>Faults reported:</b> ${faults.map(escapeHtml).join('; ')}</p>` : ''}
+      <p style="margin:8px 0 0;color:#666">Hours still need logging in the app if the driver hasn't done it yet.</p>`;
+    try {
+      await sendToOffice(`Day report - ${name} - ${dmy(day)} - ${Math.floor(mins / 60)}h ${mins % 60}m on duty`, html);
+      return json({ ok: true });
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : String(e) }, 502);
+    }
+  }
 
   if (trip_id) {
     const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');

@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { formatTime } from '@/lib/format';
 import { clock24, toISODate } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
+import { callFunction } from '@/lib/drivers';
 import { getSendStatus, onSendStatus, sendCurrentPosition, startTracking, stopTracking, type SendStatus } from '@/lib/tracking';
 import { Button, Card, ErrorText, Muted, Row, Title, colors } from './ui';
 import { alert } from '@/lib/alert';
@@ -58,11 +59,37 @@ export function DutyCard() {
   async function goOffDuty() {
     if (!profile) return;
     setBusy(true);
+    setError(null);
     const since = profile.on_duty_since;
+    // Drivers send the day's runsheet before they finish (Billa, 2026-10-13).
+    if (since) {
+      const { data: sheets, error: sheetError } = await supabase
+        .from('runsheets')
+        .select('id')
+        .eq('driver_id', profile.id)
+        .eq('kind', 'runsheet')
+        .or(`run_date.eq.${toISODate(new Date(since))},submitted_at.gte.${since}`)
+        .limit(1);
+      if (!sheetError && !sheets?.length) {
+        setBusy(false);
+        return alert('Send your runsheet first', "You can go off duty once today's runsheet is sent to the office.", [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Send runsheet', onPress: () => router.push('/runsheet/new') },
+        ]);
+      }
+    }
     await stopTracking();
     await supabase.from('profiles').update({ on_duty: false }).eq('id', profile.id);
+    // Email the office this driver's day report (time on duty, trips, paperwork).
+    const reportError = since
+      ? await callFunction('licence-alerts', { day_report: true }).then(
+          () => null,
+          (e) => (e instanceof Error ? e.message : String(e)),
+        )
+      : null;
     await refreshProfile();
     setBusy(false);
+    if (reportError) setError(`Off duty, but the day report to the office didn't send: ${reportError}`);
     if (since) {
       const start = new Date(since);
       alert('Off duty', 'Log these hours now?', [
