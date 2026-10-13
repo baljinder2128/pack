@@ -1,0 +1,26 @@
+# Checks that each Supabase edge function is deployed and answering, without
+# signing in. A deployed function with Verify JWT off replies 401 "Please sign
+# in again"; 404 means it isn't deployed; 401 from the gateway means Verify JWT is on.
+name: Check edge functions
+on:
+  push:
+    paths: ['.github/workflows/check-functions.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call each function
+        run: |
+          for f in manage-driver send-inspection send-rcti send-payslip abn-lookup; do
+            echo "=== $f"
+            curl -s -o /tmp/opt -w "OPTIONS %{http_code} allow-origin=%header{access-control-allow-origin}\n" -X OPTIONS \
+              -H "Origin: https://baljinder2128.github.io" -H "Access-Control-Request-Method: POST" \
+              -H "Access-Control-Request-Headers: authorization,x-client-info,apikey,content-type" \
+              https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/$f
+            curl -s -w "\nPOST %{http_code}\n" -X POST -H "Content-Type: application/json" -d '{}' \
+              https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/$f | head -c 400
+            echo
+          done
