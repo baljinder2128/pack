@@ -3,7 +3,9 @@
 //
 // Deploy in the Supabase dashboard (Edge Functions > Deploy a new function),
 // name it send-payslip and turn Verify JWT off: the caller is checked below.
-// Sends from Gmail when the GMAIL_USER and GMAIL_APP_PASSWORD secrets are set
+// Sends with Brevo when BREVO_API_KEY and BREVO_SENDER (a sender email you
+// verified in Brevo, e.g. sbtpayadvice@gmail.com) are set: free, no domain needed.
+// Otherwise sends from Gmail when the GMAIL_USER and GMAIL_APP_PASSWORD secrets are set
 // (an app password from myaccount.google.com/apppasswords, not the normal
 // Gmail password). Otherwise uses Resend (RESEND_API_KEY), which only reaches
 // the office until a domain is verified there.
@@ -69,6 +71,26 @@ Deno.serve(async (req) => {
   const subject = `Payslip #${slip.number} - ${name} - week ${period}`;
   const filename = `Payslip-${slip.number}-${name.replace(/[^A-Za-z0-9]+/g, '-')}.pdf`;
   const cc = to[0] === office ? undefined : [office];
+
+  const brevoKey = Deno.env.get('BREVO_API_KEY')?.trim();
+  const brevoSender = Deno.env.get('BREVO_SENDER')?.trim();
+  if (brevoKey && brevoSender) {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': brevoKey, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        sender: { name: 'SBT Truckin', email: brevoSender },
+        to: to.map((email) => ({ email })),
+        cc: cc?.map((email) => ({ email })),
+        replyTo: { email: office },
+        subject,
+        htmlContent: html,
+        attachment: [{ name: filename, content: pdf_base64 }],
+      }),
+    });
+    if (res.ok) return json({ ok: true, to: to[0] });
+    return json({ error: `Brevo could not send it: ${(await res.text()).slice(0, 300)}` }, 502);
+  }
 
   // Tolerate spaces and quotes pasted in with the secrets.
   const gmailUser = Deno.env.get('GMAIL_USER')?.trim().replace(/^["']|["']$/g, '');
