@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { Image, Linking, Platform, Pressable, Text, View } from 'react-native';
 
 import { Badge, Button, Card, ErrorText, Loading, Muted, Screen, Title, colors } from '@/components/ui';
+import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
+import { callFunction } from '@/lib/drivers';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
 import type { Runsheet } from '@/lib/types';
@@ -45,6 +47,19 @@ export default function RunsheetDetail() {
     reload();
   }
 
+  async function emailOffice() {
+    setBusy(true);
+    setError(null);
+    try {
+      await callFunction('licence-alerts', { runsheet_id: id });
+      alert('Emailed', 'The runsheet and its photos were emailed to the office.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading && !data) return <Loading />;
   if (!data) return <ErrorText>{loadError ?? 'Not found'}</ErrorText>;
   const { sheet, urls } = data;
@@ -83,6 +98,7 @@ export default function RunsheetDetail() {
           busy={busy}
         />
       )}
+      <Button title="Email this runsheet to the office" variant="secondary" onPress={emailOffice} busy={busy} />
     </Screen>
   );
 }
