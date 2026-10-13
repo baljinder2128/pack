@@ -111,7 +111,7 @@ export default function RctiScreen() {
       week.reload();
       await emailRcti(rcti, pdf);
       if (uploadError)
-        throw new Error(`RCTI #${rcti.number} was emailed, but it couldn't be saved to the archive: ${uploadError.message}. Run the 0005 SQL in Supabase, then re-issue.`);
+        throw new Error(`RCTI #${rcti.number} was emailed, but it couldn't be saved to the archive: ${uploadError.message}. The rcti-pdfs storage is missing: run 0005_rcti_archive.sql in the Supabase SQL editor, then tap Update RCTI.`);
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -120,10 +120,18 @@ export default function RctiScreen() {
   }
 
   async function emailRcti(rcti: Rcti, pdf: Uint8Array) {
-    setMsg('Emailing the RCTI to the office…');
+    setMsg('Emailing the RCTI…');
     try {
-      await callFunction('send-payslip', { rcti_id: rcti.id, pdf_base64: toBase64(pdf) });
-      setMsg(`RCTI #${rcti.number} emailed to sbtruckin@outlook.com as a PDF.`);
+      const res = await callFunction<{ ok: true; to: string; employee_error?: string }>('send-payslip', {
+        rcti_id: rcti.id,
+        pdf_base64: toBase64(pdf),
+      });
+      const email = week.data?.driver.email;
+      setMsg(
+        res.employee_error
+          ? `RCTI #${rcti.number} could not go to ${email}, so it was emailed to ${res.to} instead.`
+          : `RCTI #${rcti.number} emailed to ${res.to}${res.to === email ? ' with a copy to the office' : ''}.`,
+      );
     } catch (e) {
       setMsg(null);
       throw new Error(`RCTI #${rcti.number} is issued, but the email failed: ${e instanceof Error ? e.message : e}`);

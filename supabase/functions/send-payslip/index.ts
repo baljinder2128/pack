@@ -1,6 +1,6 @@
-// Emails an issued payslip (PDF made by the app) to the employee, with a
-// copy to the office. Also emails RCTIs to the office, so a separate
-// send-rcti function isn't needed.
+// Emails an issued payslip or RCTI (PDF made by the app) to the driver, with a
+// copy to the office. Also emails RCTIs, so a separate send-rcti function
+// isn't needed.
 //
 // Deploy in the Supabase dashboard (Edge Functions > Deploy a new function),
 // name it send-payslip and turn Verify JWT off: the caller is checked below.
@@ -55,16 +55,15 @@ Deno.serve(async (req) => {
   let html: string;
 
   if (rcti_id) {
-    // RCTIs go to the office only (same email as the old send-rcti function).
     const { data: rcti, error } = await admin
       .from('rctis')
-      .select('*, driver:profiles!rctis_driver_id_fkey(full_name)')
+      .select('*, driver:profiles!rctis_driver_id_fkey(full_name, email)')
       .eq('id', rcti_id)
       .single();
     if (error || !rcti) return json({ error: error?.message ?? 'RCTI not found' }, 404);
     const driver = rcti.driver?.full_name ?? 'Driver';
     const period = `${dmy(rcti.week_start)} to ${dmy(rcti.week_end)}`;
-    to = [office];
+    to = rcti.driver?.email ? [rcti.driver.email] : [office];
     subject = `RCTI #${rcti.number} - ${driver} - week ${period}`;
     filename = `RCTI-${rcti.number}-${driver.replace(/[^A-Za-z0-9]+/g, '-')}.pdf`;
     html = `
