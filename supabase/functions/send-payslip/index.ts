@@ -1,5 +1,6 @@
 // Emails an issued payslip (PDF made by the app) to the employee, with a
-// copy to the office.
+// copy to the office. Also emails RCTIs to the office, so a separate
+// send-rcti function isn't needed.
 //
 // Deploy in the Supabase dashboard (Edge Functions > Deploy a new function),
 // name it send-payslip and turn Verify JWT off: the caller is checked below.
@@ -11,7 +12,7 @@
 // the office until a domain is verified there.
 // Optional secret: RCTI_EMAIL (office copy, default sbtruckin@outlook.com).
 //
-// Body: { payslip_id, pdf_base64 }
+// Body: { payslip_id, pdf_base64 } or { rcti_id, pdf_base64 }
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.16';
 
@@ -41,25 +42,51 @@ Deno.serve(async (req) => {
   const { data: auth, error: authError } = await admin.auth.getUser(token);
   if (authError || !auth.user) return json({ error: 'Please sign in again' }, 401);
   const { data: me } = await admin.from('profiles').select('role').eq('id', auth.user.id).maybeSingle();
-  if (me?.role !== 'office') return json({ error: 'Only office users can send payslips' }, 403);
+  if (me?.role !== 'office') return json({ error: 'Only office users can send payslips and RCTIs' }, 403);
 
-  const { payslip_id, pdf_base64 } = await req.json().catch(() => ({}));
-  if (!payslip_id || !pdf_base64) return json({ error: 'payslip_id and pdf_base64 are required' }, 400);
-
-  const { data: slip, error } = await admin
-    .from('payslips')
-    .select('*, employee:profiles!payslips_employee_id_fkey(full_name, email)')
-    .eq('id', payslip_id)
-    .single();
-  if (error || !slip) return json({ error: error?.message ?? 'Payslip not found' }, 404);
+  const { payslip_id, rcti_id, pdf_base64 } = await req.json().catch(() => ({}));
+  if (!(payslip_id || rcti_id) || !pdf_base64) return json({ error: 'payslip_id or rcti_id, and pdf_base64, are required' }, 400);
 
   const office = Deno.env.get('RCTI_EMAIL') ?? 'sbtruckin@outlook.com';
   const from = Deno.env.get('EMAIL_FROM') ?? 'SBT Truckin <onboarding@resend.dev>';
-  const name = slip.employee?.full_name ?? 'Employee';
-  const to = slip.employee?.email ? [slip.employee.email] : [office];
-  const period = `${dmy(slip.week_start)} to ${dmy(slip.week_end)}`;
+  let to: string[];
+  let subject: string;
+  let filename: string;
+  let html: string;
 
-  const html = `
+  if (rcti_id) {
+    // RCTIs go to the office only (same email as the old send-rcti function).
+    const { data: rcti, error } = await admin
+      .from('rctis')
+      .select('*, driver:profiles!rctis_driver_id_fkey(full_name)')
+      .eq('id', rcti_id)
+      .single();
+    if (error || !rcti) return json({ error: error?.message ?? 'RCTI not found' }, 404);
+    const driver = rcti.driver?.full_name ?? 'Driver';
+    const period = `${dmy(rcti.week_start)} to ${dmy(rcti.week_end)}`;
+    to = [office];
+    subject = `RCTI #${rcti.number} - ${driver} - week ${period}`;
+    filename = `RCTI-${rcti.number}-${driver.replace(/[^A-Za-z0-9]+/g, '-')}.pdf`;
+    html = `
+    <h2 style="margin:0 0 8px">RCTI #${rcti.number}: ${escapeHtml(driver)}</h2>
+    <p style="margin:0 0 4px"><b>Week:</b> ${period}</p>
+    <p style="margin:0 0 4px"><b>Subtotal (ex GST):</b> ${money(rcti.subtotal)}</p>
+    <p style="margin:0 0 4px"><b>GST:</b> ${money(rcti.gst)}</p>
+    <p style="margin:0 0 4px;font-size:16px"><b>Total payable:</b> ${money(rcti.total)}</p>
+    <p>The RCTI is attached as a PDF.</p>`;
+  } else {
+    const { data: slip, error } = await admin
+      .from('payslips')
+      .select('*, employee:profiles!payslips_employee_id_fkey(full_name, email)')
+      .eq('id', payslip_id)
+      .single();
+    if (error || !slip) return json({ error: error?.message ?? 'Payslip not found' }, 404);
+    const name = slip.employee?.full_name ?? 'Employee';
+    const period = `${dmy(slip.week_start)} to ${dmy(slip.week_end)}`;
+    to = slip.employee?.email ? [slip.employee.email] : [office];
+    subject = `Payslip #${slip.number} - ${name} - week ${period}`;
+    filename = `Payslip-${slip.number}-${name.replace(/[^A-Za-z0-9]+/g, '-')}.pdf`;
+    html = `
     <p>Hi ${escapeHtml(name.split(' ')[0])},</p>
     <p>Your payslip for the week ${period} is attached.</p>
     <p style="margin:0 0 4px"><b>Gross pay:</b> ${money(slip.gross)}</p>
@@ -67,9 +94,7 @@ Deno.serve(async (req) => {
     <p style="margin:0 0 4px;font-size:16px"><b>Net pay:</b> ${money(slip.net)} (paid ${dmy(slip.pay_date)})</p>
     <p style="margin:0 0 4px"><b>Super:</b> ${money(slip.super)}</p>
     <p>SBT Truckin</p>`;
-
-  const subject = `Payslip #${slip.number} - ${name} - week ${period}`;
-  const filename = `Payslip-${slip.number}-${name.replace(/[^A-Za-z0-9]+/g, '-')}.pdf`;
+  }
   const cc = to[0] === office ? undefined : [office];
 
   const brevoKey = Deno.env.get('BREVO_API_KEY')?.trim();

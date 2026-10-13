@@ -119,7 +119,7 @@ export default function RctiScreen() {
   async function emailRcti(rcti: Rcti, pdf: Uint8Array) {
     setMsg('Emailing the RCTI to the office…');
     try {
-      await callFunction('send-rcti', { rcti_id: rcti.id, pdf_base64: toBase64(pdf) });
+      await callFunction('send-payslip', { rcti_id: rcti.id, pdf_base64: toBase64(pdf) });
       setMsg(`RCTI #${rcti.number} emailed to sbtruckin@outlook.com as a PDF.`);
     } catch (e) {
       setMsg(null);
