@@ -32,6 +32,14 @@ function escapeHtml(value: unknown): string {
 const money = (n: number) => `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const dmy = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 
+// The office address is set on the Company details screen (0013 SQL); before that
+// it falls back to the RCTI_EMAIL secret, then sbtruckin@outlook.com.
+// deno-lint-ignore no-explicit-any
+async function officeEmail(admin: any): Promise<string> {
+  const { data } = await admin.from('company').select('office_email').eq('id', 1).maybeSingle();
+  return (data as { office_email?: string } | null)?.office_email?.trim() || Deno.env.get('RCTI_EMAIL') || 'sbtruckin@outlook.com';
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -47,7 +55,7 @@ Deno.serve(async (req) => {
   const { payslip_id, rcti_id, pdf_base64 } = await req.json().catch(() => ({}));
   if (!(payslip_id || rcti_id) || !pdf_base64) return json({ error: 'payslip_id or rcti_id, and pdf_base64, are required' }, 400);
 
-  const office = Deno.env.get('RCTI_EMAIL') ?? 'sbtruckin@outlook.com';
+  const office = await officeEmail(admin);
   const from = Deno.env.get('EMAIL_FROM') ?? 'SBT Truckin <onboarding@resend.dev>';
   let to: string[];
   let subject: string;

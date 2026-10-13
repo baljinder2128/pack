@@ -170,4 +170,14 @@ check('old runsheets default to runsheet', (await db.query(`select count(*)::int
 check('unknown kind rejected', String(await as(D, `insert into runsheets (driver_id,run_date,kind) values ('${D}','2026-10-13','pizza')`)).startsWith('ERR'));
 await q(fs.readFileSync(new URL('../migrations/0012_fuel_dockets.sql', import.meta.url), 'utf8'));
 check('0012 can be run twice', true);
+// 0013: load acceptance and the office email setting.
+await q(fs.readFileSync(new URL('../migrations/0013_load_accept_office_email.sql', import.meta.url), 'utf8'));
+await as(O, `insert into trips (driver_id,pickup,dropoff,status) values ('${D}','Botany','Wetherill Park','planned')`);
+check('driver accepts own planned load', (await as(D, `update trips set accepted_at=now() where driver_id='${D}' and pickup='Botany' returning *`)).length===1);
+check('other driver cannot accept it', (await as(D2, `update trips set accepted_at=now() where pickup='Botany' returning *`)).length===0);
+check('office email defaults to sbtruckin', (await db.query(`select office_email from company`)).rows[0].office_email==='sbtruckin@outlook.com');
+check('office changes office email', (await as(O, `update company set office_email='new@x.com' returning *`)).length===1);
+check('driver cannot change office email', (await as(D, `update company set office_email='evil@x.com' returning *`)).length===0);
+await q(fs.readFileSync(new URL('../migrations/0013_load_accept_office_email.sql', import.meta.url), 'utf8'));
+check('0013 can be run twice', true);
 if (failed) process.exit(1);

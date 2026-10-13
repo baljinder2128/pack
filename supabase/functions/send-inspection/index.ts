@@ -29,16 +29,24 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// The office address is set on the Company details screen (0013 SQL); before that
+// it falls back to the INSPECTION_EMAIL secret, then sbtruckin@outlook.com.
+// deno-lint-ignore no-explicit-any
+async function officeEmail(admin: any): Promise<string> {
+  const { data } = await admin.from('company').select('office_email').eq('id', 1).maybeSingle();
+  return (data as { office_email?: string } | null)?.office_email?.trim() || Deno.env.get('INSPECTION_EMAIL') || 'sbtruckin@outlook.com';
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const url = Deno.env.get('SUPABASE_URL')!;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const resendKey = Deno.env.get('RESEND_API_KEY');
-  const to = Deno.env.get('INSPECTION_EMAIL') ?? 'sbtruckin@outlook.com';
   const from = Deno.env.get('EMAIL_FROM') ?? 'SBT Truckin <onboarding@resend.dev>';
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const to = await officeEmail(admin);
 
   // Check the caller is signed in, and is the driver who made it or office.
   // Works with both the legacy and the new Supabase API keys.

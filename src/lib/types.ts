@@ -37,6 +37,7 @@ export type Company = {
   address: string;
   email: string;
   rcti_agreement: string;
+  office_email?: string;
 };
 
 export type TripStatus = 'planned' | 'in_progress' | 'completed';
@@ -44,6 +45,7 @@ export type TripStatus = 'planned' | 'in_progress' | 'completed';
 export type Trip = {
   id: string;
   archived_at: string | null;
+  accepted_at?: string | null;
   driver_id: string;
   trip_date: string;
   truck_rego: string;

@@ -6,7 +6,7 @@ import { DutyCard } from '@/components/DutyCard';
 import { LicenceAlert } from '@/components/LicenceAlert';
 import { RunsheetList } from '@/components/RunsheetList';
 import { SignalWarning } from '@/components/SignalWarning';
-import { Badge, Button, Card, Empty, ErrorText, Hero, Loading, Muted, Row, Screen, Segmented, Title } from '@/components/ui';
+import { Badge, Button, Card, Empty, ErrorText, Hero, Loading, Muted, Row, Screen, Segmented, Title, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDate, formatDateTime, statusColor, statusLabel } from '@/lib/format';
 import { addDays, toISODate } from '@/lib/pay';
@@ -14,14 +14,14 @@ import { supabase } from '@/lib/supabase';
 import type { Trip } from '@/lib/types';
 import { unwrap, useFocusQuery } from '@/lib/useQuery';
 
-type Filter = 'active' | 'recent' | 'runsheets' | 'fuel' | 'archive';
+type Filter = 'active' | 'recent' | 'runsheets' | 'archive';
 
 export default function TripsScreen() {
   const { isOffice, profile } = useAuth();
   const [filter, setFilter] = useState<Filter>('active');
 
   const { data, loading, error } = useFocusQuery(async () => {
-    if (filter === 'runsheets' || filter === 'fuel') return [] as Trip[];
+    if (filter === 'runsheets') return [] as Trip[];
     let q = supabase.from('trips').select('*, driver:profiles!trips_driver_id_fkey(full_name)');
     if (filter === 'archive') return unwrap(await q.not('archived_at', 'is', null).order('trip_date', { ascending: false }).limit(200)) as Trip[];
     q = q.is('archived_at', null);
@@ -59,12 +59,11 @@ export default function TripsScreen() {
           { value: 'active', label: 'Active' },
           { value: 'recent', label: '2 weeks' },
           { value: 'runsheets', label: 'Runsheets' },
-          { value: 'fuel', label: 'Fuel' },
           ...(isOffice ? [{ value: 'archive' as const, label: 'Archive' }] : []),
         ]}
       />
-      {filter === 'runsheets' || filter === 'fuel' ? (
-        <RunsheetList key={filter} kind={filter === 'fuel' ? 'fuel' : 'runsheet'} />
+      {filter === 'runsheets' ? (
+        <RunsheetList />
       ) : (
         <>
           <ErrorText>{error}</ErrorText>
@@ -80,6 +79,12 @@ export default function TripsScreen() {
                 </Row>
                 <Row>
                   <Badge label={statusLabel[t.status]} color={statusColor[t.status]} />
+                  {t.status === 'planned' && t.accepted_at !== undefined && (
+                    <Badge
+                      label={t.accepted_at ? 'Accepted' : 'Not accepted'}
+                      color={t.accepted_at ? colors.success : colors.warning}
+                    />
+                  )}
                   <Muted>
                     {t.customer ? `${t.customer} · ` : ''}
                     {formatDate(t.trip_date)} · {t.truck_rego}

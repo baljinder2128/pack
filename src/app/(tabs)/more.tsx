@@ -61,6 +61,12 @@ export default function MoreScreen() {
       </View>
       <MenuList
         items={[
+          {
+            icon: 'water-outline',
+            label: 'Fuel dockets',
+            hint: isOffice ? 'Fuel receipts drivers have sent' : 'Send a photo of a fuel receipt to the office',
+            onPress: () => router.push('/fuel'),
+          },
           { icon: 'person-circle-outline', label: 'My details', hint: 'Name, phone, ABN and password', onPress: () => router.push('/profile') },
           ...(!isOffice
             ? ([

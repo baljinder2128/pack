@@ -14,6 +14,7 @@
 //                       office and update their expiry date. Needs the driver's sign-in.
 //   { runsheet_id }  -> a driver submitted their end-of-day runsheet or a fuel docket:
 //                       email the photos to the office. Needs the driver's sign-in.
+//   { trip_id }      -> a driver accepted a load the office planned: tell the office.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.16';
 
@@ -49,9 +50,18 @@ function daysBetween(from: string, to: string): number {
 
 type Attachment = { filename: string; base64: string; contentType: string };
 
+// The office address is set on the Company details screen (0013 SQL); before that
+// it falls back to the RCTI_EMAIL secret, then sbtruckin@outlook.com.
+// deno-lint-ignore no-explicit-any
+async function officeEmail(admin: any): Promise<string> {
+  const { data } = await admin.from('company').select('office_email').eq('id', 1).maybeSingle();
+  return (data as { office_email?: string } | null)?.office_email?.trim() || Deno.env.get('RCTI_EMAIL') || 'sbtruckin@outlook.com';
+}
+
+let office = 'sbtruckin@outlook.com';
+
 /** Sends to the office with Brevo, Gmail or Resend (whichever is set up). */
 async function sendToOffice(subject: string, html: string, attachments: Attachment[] = []): Promise<void> {
-  const office = Deno.env.get('RCTI_EMAIL') ?? 'sbtruckin@outlook.com';
 
   const brevoKey = Deno.env.get('BREVO_API_KEY')?.trim();
   const brevoSender = Deno.env.get('BREVO_SENDER')?.trim();
@@ -114,7 +124,42 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false },
   });
-  const { renewal_id, runsheet_id } = await req.json().catch(() => ({}));
+  const { renewal_id, runsheet_id, trip_id } = await req.json().catch(() => ({}));
+  office = await officeEmail(admin);
+
+  if (trip_id) {
+    const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+    const { data: auth, error: authError } = await admin.auth.getUser(token);
+    if (authError || !auth.user) return json({ error: 'Please sign in again' }, 401);
+    const { data: trip, error } = await admin
+      .from('trips')
+      .select('*, driver:profiles!trips_driver_id_fkey(full_name, phone)')
+      .eq('id', trip_id)
+      .single();
+    if (error || !trip) return json({ error: error?.message ?? 'Trip not found' }, 404);
+    if (trip.driver_id !== auth.user.id) return json({ error: 'Not your load' }, 403);
+    if (!trip.accepted_at) return json({ error: 'This load has not been accepted' }, 400);
+
+    const name = trip.driver?.full_name ?? 'A driver';
+    const when = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'short' }).format(new Date(trip.accepted_at));
+    const row = (k: string, v: unknown) => (v ? `<p style="margin:0 0 4px"><b>${k}:</b> ${escapeHtml(v)}</p>` : '');
+    const html = `
+      <h2 style="margin:0 0 8px">Load accepted: ${escapeHtml(name)}</h2>
+      <p style="margin:0 0 8px">${escapeHtml(name)} accepted this load at ${when}.</p>
+      ${row('Date', dmy(trip.trip_date))}
+      ${row('From', trip.pickup)}
+      ${row('To', trip.dropoff)}
+      ${row('Customer', trip.customer)}
+      ${row('Job', trip.job_ref)}
+      ${row('Truck', [trip.truck_rego, trip.trailer_rego].filter(Boolean).join(' / '))}
+      ${row('Driver phone', trip.driver?.phone)}`;
+    try {
+      await sendToOffice(`Load accepted - ${name} - ${trip.pickup || '?'} to ${trip.dropoff || '?'} - ${dmy(trip.trip_date)}`, html);
+      return json({ ok: true });
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : String(e) }, 502);
+    }
+  }
 
   if (runsheet_id) {
     const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');

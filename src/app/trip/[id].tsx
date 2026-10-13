@@ -3,8 +3,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Text } from 'react-native';
 
-import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Title } from '@/components/ui';
+import { Badge, Button, Card, ErrorText, Field, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
 import { setArchived } from '@/lib/archive';
+import { callFunction } from '@/lib/drivers';
 import { useAuth } from '@/lib/auth';
 import { formatDate, formatDateTime, numOrNull, openMap, statusColor, statusLabel } from '@/lib/format';
 import { money } from '@/lib/pay';
@@ -49,6 +50,24 @@ export default function TripDetail() {
     setBusy(false);
     if (error) setActionError(error.message);
     else reload();
+  }
+
+  async function accept() {
+    setBusy(true);
+    setActionError(null);
+    const { error: e } = await supabase.from('trips').update({ accepted_at: new Date().toISOString() }).eq('id', id);
+    if (e) {
+      setBusy(false);
+      return setActionError(/accepted_at|schema cache/i.test(e.message) ? `${e.message}. The office needs to run the 0013 SQL in Supabase.` : e.message);
+    }
+    // The office is emailed; the load is accepted either way.
+    const emailError = await callFunction('licence-alerts', { trip_id: id }).then(
+      () => null,
+      (err) => (err instanceof Error ? err.message : String(err)),
+    );
+    setBusy(false);
+    if (emailError) setActionError(`Accepted, but the email to the office didn't go: ${emailError}`);
+    reload();
   }
 
   async function start() {
@@ -118,6 +137,11 @@ export default function TripDetail() {
           Odometer: {trip.start_odometer ?? '-'} → {trip.end_odometer ?? '-'}
           {km !== null ? ` (${km} km)` : ''}
         </Text>
+        {trip.status === 'planned' && (
+          <Text style={{ fontWeight: '700', color: trip.accepted_at ? colors.success : colors.warning }}>
+            {trip.accepted_at ? `Accepted by driver ${formatDateTime(trip.accepted_at)}` : 'Not accepted by the driver yet'}
+          </Text>
+        )}
         <Text>Started: {formatDateTime(trip.started_at)}</Text>
         <Text>Finished: {formatDateTime(trip.finished_at)}</Text>
         {isOffice && <Text>Pay: {money(trip.amount)} inc GST</Text>}
@@ -132,6 +156,9 @@ export default function TripDetail() {
         />
       )}
 
+      {trip.status === 'planned' && isMine && !trip.accepted_at && (
+        <Button title="Accept this load" onPress={accept} busy={busy} />
+      )}
       {trip.status === 'planned' && (
         <>
           <Button
