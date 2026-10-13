@@ -8,6 +8,7 @@
 //   { action: 'remove', user_id }          -> blocks the login, keeps their history
 //   { action: 'restore', user_id }         -> lets a removed driver sign in again
 //   { action: 'reset_password', user_id, password }
+//   { action: 'change_email', user_id, email }  -> changes their sign-in email
 //   { action: 'delete', user_id }          -> deletes the login and all their records for good,
 //                                             unless they have RCTIs or payslips (kept for the ATO)
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -101,6 +102,17 @@ Deno.serve(async (req) => {
       if (password.length < 8) return json({ error: 'Password must be at least 8 characters' }, 400);
       const { error } = await admin.auth.admin.updateUserById(String(body.user_id ?? ''), { password });
       if (error) return json({ error: error.message }, 400);
+      return json({ ok: true });
+    }
+
+    case 'change_email': {
+      const userId = String(body.user_id ?? '');
+      const email = String(body.email ?? '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Enter a valid email address' }, 400);
+      const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true });
+      if (error) return json({ error: /already/i.test(error.message) ? 'Another login already uses that email' : error.message }, 400);
+      const { error: profileError } = await admin.from('profiles').update({ email }).eq('id', userId);
+      if (profileError) return json({ error: `Login email changed, but the profile wasn't: ${profileError.message}` }, 500);
       return json({ ok: true });
     }
 

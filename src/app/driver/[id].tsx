@@ -44,6 +44,7 @@ export default function DriverScreen() {
   const [studyLoan, setStudyLoan] = useState(false);
   const [role, setRole] = useState<Role>('driver');
   const [newPassword, setNewPassword] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -273,6 +274,30 @@ export default function DriverScreen() {
       <Field label="Address" value={form.address} onChangeText={set('address')} multiline />
       {payType === 'abn' && <Toggle label="Registered for GST" value={gst} onChange={setGst} />}
       <Button title="Save" onPress={save} busy={busy} />
+
+      <Card>
+        <Title>Change email</Title>
+        <Muted>This is the email they sign in with. Payslips and RCTIs go to it too.</Muted>
+        <Field
+          label="New email"
+          value={newEmail}
+          onChangeText={setNewEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          placeholder={driver.email ?? ''}
+        />
+        <Button
+          title="Change email"
+          variant="secondary"
+          busy={busy}
+          onPress={() =>
+            run(async () => {
+              await callFunction('manage-driver', { action: 'change_email', user_id: id, email: newEmail });
+              setNewEmail('');
+            }, `Email changed. They now sign in with ${newEmail.trim().toLowerCase()} and the same password.`)
+          }
+        />
+      </Card>
 
       <Card>
         <Title>Reset password</Title>
