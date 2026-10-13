@@ -47,3 +47,10 @@ jobs:
           curl -s -w "\nfleet_number HTTP %{http_code}\n" "$U/rest/v1/vehicles?select=fleet_number&limit=1" -H "apikey: $K"
           # New licence-alerts code reports photosRemoved in the daily check's reply.
           curl -s -w "\ndaily HTTP %{http_code}\n" -X POST -H "Content-Type: application/json" -H "apikey: $K" -d '{}' "$U/functions/v1/licence-alerts"
+      - name: Is the day report code deployed?
+        run: |
+          # New licence-alerts code answers 401 "Please sign in again" for day_report; old code runs the daily check (200).
+          curl -s -w "\nHTTP %{http_code}\n" -X POST -H "Content-Type: application/json" \
+            -H "apikey: sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP" \
+            -d '{"day_report":true}' \
+            https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/licence-alerts
