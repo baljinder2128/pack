@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Text } from 'react-native';
 
 import { WeekNav } from '@/components/WeekNav';
-import { Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
+import { Button, Card, Empty, ErrorText, Hero, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDate, formatTime } from '@/lib/format';
 import { addDays, money, round2, shiftHours, toISODate, weekStart } from '@/lib/pay';
@@ -59,17 +59,25 @@ export default function HoursScreen() {
       <WeekNav start={start} onChange={setStart} />
       <ErrorText>{error}</ErrorText>
       {totals.size > 0 && (
-        <Card>
-          <Title>Week total</Title>
-          {[...totals.values()].map((t) => (
-            <Text key={t.name} style={{ fontSize: 16 }}>
-              {isOffice ? `${t.name}: ` : ''}
-              <Text style={{ fontWeight: '700' }}>{t.hours} hrs</Text>
-              {t.pay > 0 ? ` · ${money(t.pay)}` : ''}
-            </Text>
-          ))}
-          <Muted>Pay for hours so far this week. Trips and the full pay are on the {isOffice ? 'Pay' : 'My pay'} tab.</Muted>
-        </Card>
+        <Hero
+          label="This week so far"
+          value={`${round2([...totals.values()].reduce((h, t) => h + t.hours, 0))} hrs`}
+          sub={(() => {
+            const pay = round2([...totals.values()].reduce((p, t) => p + t.pay, 0));
+            return pay > 0 ? `${money(pay)} earned from hours` : undefined;
+          })()}
+        >
+          {isOffice &&
+            [...totals.values()].map((t) => (
+              <Text key={t.name} style={{ color: '#d4d6dc', fontSize: 15 }}>
+                {t.name}: <Text style={{ color: '#fff', fontWeight: '700' }}>{t.hours} hrs</Text>
+                {t.pay > 0 ? ` · ${money(t.pay)}` : ''}
+              </Text>
+            ))}
+          <Text style={{ color: '#8b8f9a', fontSize: 12, marginTop: 4 }}>
+            Trips and the full pay are on the {isOffice ? 'Pay' : 'My pay'} tab.
+          </Text>
+        </Hero>
       )}
       {loading && !data ? (
         <Loading />

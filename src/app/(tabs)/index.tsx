@@ -33,7 +33,7 @@ export default function TripsScreen() {
       {isOffice ? (
         <>
           <SignalWarning showMapLink={false} />
-          <Button title="Live map: where are my drivers?" variant="success" onPress={() => router.push('/live-map')} />
+          <Button title="Live map: where are my drivers?" variant="secondary" onPress={() => router.push('/live-map')} />
         </>
       ) : (
         <DutyCard />

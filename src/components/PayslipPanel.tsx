@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Linking, Platform, Text } from 'react-native';
 
-import { Button, Card, ErrorText, Muted, Row, Title, colors } from '@/components/ui';
+import { Button, Card, ErrorText, Hero, Muted, Row, Title, colors } from '@/components/ui';
 import { callFunction } from '@/lib/drivers';
 import { formatDateTime } from '@/lib/format';
 import { money, toDMY, toISODate, weekEnd, type RctiTotals } from '@/lib/pay';
@@ -159,8 +159,17 @@ export function PayslipPanel({
 
   return (
     <>
+      <Hero
+        label="Net pay this week"
+        value={money(slip.net)}
+        sub={`Gross ${money(slip.gross)} · tax ${money(slip.tax + slip.stsl)} · super ${money(slip.super)}`}
+      >
+        <Text style={{ color: issued ? '#86efac' : '#fca5a5', fontWeight: '700', marginTop: 4 }}>
+          {issued ? `Payslip #${issued.number} issued ${formatDateTime(issued.issued_at)}` : 'Payslip not issued yet'}
+        </Text>
+      </Hero>
       <Card>
-        <Title>Payslip (TFN employee)</Title>
+        <Title>Payslip details</Title>
         <Row>
           <Text style={{ flex: 1, fontSize: 16 }}>Gross pay ({slip.hours} hrs)</Text>
           <Text style={{ fontSize: 16 }}>{money(slip.gross)}</Text>

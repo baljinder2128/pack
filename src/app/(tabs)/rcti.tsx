@@ -7,7 +7,7 @@ import { Platform, Text } from 'react-native';
 import { DriverPicker } from '@/components/DriverPicker';
 import { PayslipPanel } from '@/components/PayslipPanel';
 import { WeekNav } from '@/components/WeekNav';
-import { Button, Card, Empty, ErrorText, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
+import { Button, Card, Empty, ErrorText, Hero, Loading, Muted, Row, Screen, Title, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { callFunction, listDrivers } from '@/lib/drivers';
 import { formatDate, formatDateTime } from '@/lib/format';
@@ -210,27 +210,29 @@ export default function RctiScreen() {
         <Loading />
       ) : w ? (
         <>
-          <Card>
-            <Title>{w.driver.full_name}</Title>
-            <Muted>
-              {formatDate(start)} – {formatDate(weekEnd(start))} · {tfn ? 'TFN employee (payslip)' : 'ABN contractor (RCTI)'}
-            </Muted>
-            {!tfn && (
-              <>
-                <Text style={{ fontSize: 16 }}>Hours: {w.totals.hours}</Text>
-                <Text style={{ fontSize: 16 }}>Subtotal (ex GST): {money(w.totals.subtotal)}</Text>
-                <Text style={{ fontSize: 16 }}>GST included: {money(w.totals.gst)}</Text>
-                <Text style={{ fontSize: 18, fontWeight: '800' }}>Total (inc GST): {money(w.totals.total)}</Text>
-                {w.issued ? (
-                  <Muted>
-                    RCTI #{w.issued.number} issued {formatDateTime(w.issued.issued_at)}
-                  </Muted>
-                ) : (
-                  <Muted>Not issued yet</Muted>
-                )}
-              </>
-            )}
-          </Card>
+          {tfn ? (
+            <Card>
+              <Title>{w.driver.full_name}</Title>
+              <Muted>
+                {formatDate(start)} – {formatDate(weekEnd(start))} · TFN employee (payslip)
+              </Muted>
+            </Card>
+          ) : (
+            <Hero
+              label={`${w.driver.full_name} · total inc GST`}
+              value={money(w.totals.total)}
+              sub={`${formatDate(start)} – ${formatDate(weekEnd(start))} · ABN contractor (RCTI)`}
+            >
+              <Text style={{ color: '#d4d6dc', fontSize: 15, marginTop: 6 }}>
+                {w.totals.hours} hrs · subtotal {money(w.totals.subtotal)} · GST {money(w.totals.gst)}
+              </Text>
+              <Text style={{ color: w.issued ? '#86efac' : '#fca5a5', fontWeight: '700', marginTop: 2 }}>
+                {w.issued
+                  ? `RCTI #${w.issued.number} issued ${formatDateTime(w.issued.issued_at)}`
+                  : 'Not issued yet'}
+              </Text>
+            </Hero>
+          )}
           {w.sundayEntries > 0 && (
             <Text style={{ color: colors.warning }}>
               {w.sundayEntries} entr{w.sundayEntries === 1 ? 'y is' : 'ies are'} on Sunday, which is outside the Monday to

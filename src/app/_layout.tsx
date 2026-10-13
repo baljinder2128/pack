@@ -16,7 +16,15 @@ function RootStack() {
   if (loading) return <Loading />;
   const signedIn = Boolean(session);
   return (
-    <Stack screenOptions={{ headerTintColor: colors.primary, contentStyle: { backgroundColor: colors.bg } }}>
+    <Stack
+      screenOptions={{
+        headerTintColor: colors.primary,
+        headerTitleStyle: { fontWeight: '800', color: colors.text },
+        headerStyle: { backgroundColor: colors.card },
+        headerShadowVisible: false,
+        contentStyle: { backgroundColor: colors.bg },
+      }}
+    >
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="trip/new" options={{ title: 'New trip', presentation: 'modal' }} />
@@ -55,7 +63,7 @@ export default function RootLayout() {
     <AuthProvider>
       <StatusBar style="dark" />
       {/* On a wide screen (the Windows/web version) keep the app a readable width. */}
-      <View style={{ flex: 1, backgroundColor: colors.border }}>
+      <View style={{ flex: 1, backgroundColor: '#dfe1e6' }}>
         <View style={{ flex: 1, width: '100%', maxWidth: 960, alignSelf: 'center' }}>
           <RootStack />
         </View>

@@ -12,17 +12,23 @@ import {
   type TextInputProps,
 } from 'react-native';
 
+// SBT brand: black and red, from the logo.
 export const colors = {
-  bg: '#f4f5f7',
+  bg: '#f1f2f4',
   card: '#ffffff',
-  text: '#111827',
-  muted: '#6b7280',
-  border: '#e5e7eb',
-  primary: '#1d4ed8',
-  danger: '#b91c1c',
+  text: '#111318',
+  muted: '#6b7080',
+  border: '#e4e6ea',
+  primary: '#d7141a',
+  primaryDark: '#a90f14',
+  ink: '#15171c',
+  inkSoft: '#2a2d35',
+  danger: '#c0262d',
   success: '#15803d',
   warning: '#b45309',
 };
+
+const shadow = '0px 1px 2px rgba(17, 19, 24, 0.06), 0px 6px 16px rgba(17, 19, 24, 0.06)';
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   if (!scroll) return <View style={styles.screen}>{children}</View>;
@@ -72,18 +78,20 @@ export function Button({
   const bg = {
     primary: colors.primary,
     secondary: colors.card,
-    danger: colors.danger,
+    danger: colors.card,
     success: colors.success,
   }[variant];
-  const fg = variant === 'secondary' ? colors.primary : '#fff';
+  const fg = variant === 'secondary' ? colors.ink : variant === 'danger' ? colors.danger : '#fff';
   return (
     <Pressable
       onPress={onPress}
       disabled={busy || disabled}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: bg, opacity: pressed || disabled ? 0.6 : 1 },
-        variant === 'secondary' && { borderWidth: 1, borderColor: colors.primary },
+        { backgroundColor: bg, opacity: disabled ? 0.5 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
+        (variant === 'primary' || variant === 'success') && { boxShadow: `0px 4px 12px ${bg}40` },
+        variant === 'secondary' && { borderWidth: 1, borderColor: colors.border, boxShadow: shadow },
+        variant === 'danger' && { borderWidth: 1.5, borderColor: colors.danger },
       ]}
     >
       {busy ? <ActivityIndicator color={fg} /> : <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>}
@@ -197,11 +205,34 @@ export function Segmented<T extends string>({
         <Pressable
           key={o.value}
           onPress={() => onChange(o.value)}
-          style={[styles.segment, o.value === value && { backgroundColor: colors.primary }]}
+          style={[styles.segment, o.value === value && { backgroundColor: colors.card, boxShadow: shadow }]}
         >
-          <Text style={{ color: o.value === value ? '#fff' : colors.text, fontWeight: '600' }}>{o.label}</Text>
+          <Text style={{ color: o.value === value ? colors.primary : colors.muted, fontWeight: '700' }}>{o.label}</Text>
         </Pressable>
       ))}
+    </View>
+  );
+}
+
+/** A dark headline card for the number that matters most on a screen (pay, hours). */
+export function Hero({
+  label,
+  value,
+  sub,
+  children,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <View style={styles.hero}>
+      <View style={styles.heroStripe} />
+      <Text style={styles.heroLabel}>{label}</Text>
+      <Text style={styles.heroValue}>{value}</Text>
+      {sub ? <Text style={styles.heroSub}>{sub}</Text> : null}
+      {children}
     </View>
   );
 }
@@ -225,26 +256,47 @@ export function Empty({ children }: { children: ReactNode }) {
 
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  screenContent: { padding: 16, paddingBottom: 48, gap: 12 },
-  card: { backgroundColor: colors.card, borderRadius: 12, padding: 14, gap: 4, borderWidth: 1, borderColor: colors.border },
-  title: { fontSize: 17, fontWeight: '700', color: colors.text },
-  muted: { color: colors.muted, fontSize: 14 },
+  screenContent: { padding: 16, paddingBottom: 48, gap: 14 },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#eceef1',
+    boxShadow: shadow,
+  },
+  title: { fontSize: 18, fontWeight: '800', color: colors.text, letterSpacing: -0.2 },
+  muted: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  button: { borderRadius: 10, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'center' },
-  buttonText: { fontSize: 16, fontWeight: '700' },
-  field: { gap: 4 },
-  label: { fontSize: 14, fontWeight: '600', color: colors.text },
+  button: { borderRadius: 14, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center' },
+  buttonText: { fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
+  field: { gap: 6 },
+  label: { fontSize: 14, fontWeight: '700', color: colors.inkSoft },
   input: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 16,
     color: colors.text,
   },
-  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, alignSelf: 'flex-start' },
-  segmented: { flexDirection: 'row', backgroundColor: colors.border, borderRadius: 10, padding: 3, gap: 3 },
-  segment: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
+  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, alignSelf: 'flex-start' },
+  segmented: { flexDirection: 'row', backgroundColor: '#e4e6ea', borderRadius: 12, padding: 4, gap: 4 },
+  segment: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
+  hero: {
+    backgroundColor: colors.ink,
+    borderRadius: 18,
+    padding: 18,
+    paddingTop: 22,
+    gap: 4,
+    overflow: 'hidden',
+    boxShadow: '0px 8px 24px rgba(17, 19, 24, 0.25)',
+  },
+  heroStripe: { position: 'absolute', top: 0, left: 0, right: 0, height: 4, backgroundColor: colors.primary },
+  heroLabel: { color: '#a3a7b3', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  heroValue: { color: '#ffffff', fontSize: 34, fontWeight: '800', letterSpacing: -0.5 },
+  heroSub: { color: '#d4d6dc', fontSize: 14 },
 });

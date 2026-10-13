@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
-import { Linking, Platform } from 'react-native';
+import { Linking, Platform, Text, View } from 'react-native';
 
-import { Button, Card, Muted, Screen, Title } from '@/components/ui';
+import { MenuList, type MenuItem } from '@/components/MenuList';
+import { Screen, colors, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { alert } from '@/lib/alert';
 import { supabase } from '@/lib/supabase';
@@ -27,29 +28,59 @@ export default function MoreScreen() {
       },
     ]);
   }
+  const initials = (profile?.full_name || profile?.email || '?')
+    .split(/\s+/)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
   return (
     <Screen>
-      <Card>
-        <Title>{profile?.full_name || 'My account'}</Title>
-        <Muted>
-          {profile?.email} · {isOffice ? 'Office' : 'Driver'}
-        </Muted>
-      </Card>
-      <Button title="My details" variant="secondary" onPress={() => router.push('/profile')} />
-      {isOffice && (
-        <>
-          <Button title="Drivers & logins" variant="secondary" onPress={() => router.push('/drivers')} />
-          <Button title="Company details (for RCTI)" variant="secondary" onPress={() => router.push('/company')} />
-        </>
-      )}
-      {Platform.OS === 'web' && (
-        <Button
-          title="Download the Android app"
-          variant="secondary"
-          onPress={() => Linking.openURL('https://baljinder2128.github.io/pack/download/sbt-truckin.apk')}
-        />
-      )}
-      <Button title="Sign out" variant="danger" onPress={signOut} />
+      <View style={[styles.hero, { flexDirection: 'row', alignItems: 'center', gap: 14 }]}>
+        <View style={styles.heroStripe} />
+        <View
+          style={{
+            width: 54,
+            height: 54,
+            borderRadius: 27,
+            backgroundColor: colors.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800' }}>{initials}</Text>
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ color: '#fff', fontSize: 19, fontWeight: '800' }}>{profile?.full_name || 'My account'}</Text>
+          <Text style={{ color: '#a3a7b3' }}>{profile?.email}</Text>
+          <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 12, letterSpacing: 0.8 }}>
+            {isOffice ? 'OFFICE' : 'DRIVER'}
+          </Text>
+        </View>
+      </View>
+      <MenuList
+        items={[
+          { icon: 'person-circle-outline', label: 'My details', hint: 'Name, phone, ABN and password', onPress: () => router.push('/profile') },
+          ...(isOffice
+            ? ([
+                { icon: 'people-outline', label: 'Drivers & logins', hint: 'Add drivers, pay rates and office staff', onPress: () => router.push('/drivers') },
+                { icon: 'map-outline', label: 'Live map', hint: 'Drivers on duty now and past routes', onPress: () => router.push('/live-map') },
+                { icon: 'business-outline', label: 'Company details', hint: 'Shown on RCTIs and payslips', onPress: () => router.push('/company') },
+              ] as MenuItem[])
+            : []),
+          ...(Platform.OS === 'web'
+            ? ([
+                {
+                  icon: 'logo-android',
+                  label: 'Download the Android app',
+                  onPress: () => Linking.openURL('https://baljinder2128.github.io/pack/download/sbt-truckin.apk'),
+                },
+              ] as MenuItem[])
+            : []),
+        ]}
+      />
+      <MenuList items={[{ icon: 'log-out-outline', label: 'Sign out', tone: 'danger', onPress: signOut }]} />
     </Screen>
   );
 }
