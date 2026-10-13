@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
 
@@ -6,12 +6,14 @@ import { DriverPicker } from '@/components/DriverPicker';
 import { Button, ErrorText, Field, Screen, colors } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { listDrivers } from '@/lib/drivers';
-import { parseDateInput, shiftHours, shiftTimes, toDMY, toISODate } from '@/lib/pay';
+import { clock24, parseDateInput, shiftHours, shiftTimes, toDMY, toISODate } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
-import type { Profile } from '@/lib/types';
+import type { Profile, Shift } from '@/lib/types';
 
+/** Log hours, or edit them when opened with ?id= (drivers their own, office anyone's). */
 export default function NewShift() {
-  const params = useLocalSearchParams<{ date?: string; start?: string; end?: string }>();
+  const params = useLocalSearchParams<{ id?: string; date?: string; start?: string; end?: string }>();
+  const editing = !!params.id;
   const { session, isOffice } = useAuth();
   const [drivers, setDrivers] = useState<Profile[]>([]);
   const [driverId, setDriverId] = useState<string | null>(session?.user.id ?? null);
@@ -27,6 +29,25 @@ export default function NewShift() {
     if (isOffice) listDrivers().then(setDrivers).catch(() => {});
   }, [isOffice]);
 
+  useEffect(() => {
+    if (!params.id) return;
+    supabase
+      .from('shifts')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+      .then(({ data, error: e }) => {
+        if (e || !data) return setError(e?.message ?? 'Could not load these hours.');
+        const shift = data as Shift;
+        setDriverId(shift.driver_id);
+        setDate(toDMY(shift.shift_date));
+        setStartTime(clock24(new Date(shift.start_at)));
+        setEndTime(clock24(new Date(shift.end_at)));
+        setBreakMin(String(shift.break_minutes));
+        setNotes(shift.notes ?? '');
+      });
+  }, [params.id]);
+
   const isoDate = parseDateInput(date);
   const times = isoDate ? shiftTimes(isoDate, startTime, endTime) : null;
   const breakMinutes = Number(breakMin) || 0;
@@ -38,14 +59,17 @@ export default function NewShift() {
       return setError('Start and finish are the same time. Change the finish time.');
     if (!driverId) return setError('Choose a driver.');
     setBusy(true);
-    const { error } = await supabase.from('shifts').insert({
+    const row = {
       driver_id: driverId,
       shift_date: isoDate,
       start_at: times.start.toISOString(),
       end_at: times.end.toISOString(),
       break_minutes: breakMinutes,
       notes: notes.trim() || null,
-    });
+    };
+    const { error } = editing
+      ? await supabase.from('shifts').update(row).eq('id', params.id!)
+      : await supabase.from('shifts').insert(row);
     setBusy(false);
     if (error) return setError(error.message);
     router.back();
@@ -53,6 +77,7 @@ export default function NewShift() {
 
   return (
     <Screen>
+      {editing && <Stack.Screen options={{ title: 'Edit hours' }} />}
       {isOffice && <DriverPicker drivers={drivers} value={driverId} onChange={setDriverId} />}
       <Field label="Date (DD/MM/YYYY)" value={date} onChangeText={setDate} />
       <Field label="Start time (e.g. 05:30 or 5:30 am)" value={startTime} onChangeText={setStartTime} keyboardType="numbers-and-punctuation" />
@@ -65,7 +90,12 @@ export default function NewShift() {
         </Text>
       )}
       <ErrorText>{error}</ErrorText>
-      <Button title="Save hours" onPress={save} busy={busy} />
+      {editing && (
+        <Text style={{ color: colors.muted }}>
+          If this week's RCTI or payslip is already done, tap Update on the Pay tab after saving so it is paid right.
+        </Text>
+      )}
+      <Button title={editing ? 'Save changes' : 'Save hours'} onPress={save} busy={busy} />
     </Screen>
   );
 }

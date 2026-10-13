@@ -88,9 +88,17 @@ export default function HoursScreen() {
               {isOffice && s.driver ? ` · ${s.driver.full_name}` : ''}
             </Muted>
             {s.notes && <Muted>{s.notes}</Muted>}
-            <Text style={{ color: colors.danger, marginTop: 4 }} onPress={() => remove(s)}>
-              Delete
-            </Text>
+            <Row>
+              <Text
+                style={{ color: colors.primary, fontWeight: '600', marginTop: 4, marginRight: 24 }}
+                onPress={() => router.push({ pathname: '/shift/new', params: { id: s.id } })}
+              >
+                Edit
+              </Text>
+              <Text style={{ color: colors.danger, marginTop: 4 }} onPress={() => remove(s)}>
+                Delete
+              </Text>
+            </Row>
           </Card>
         ))
       ) : (
