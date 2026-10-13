@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Linking, Platform } from 'react-native';
 
 import { Button, Card, Empty, ErrorText, Field, Loading, Muted, Row, Screen, Segmented, Title } from '@/components/ui';
+import { alert } from '@/lib/alert';
 import { useAuth } from '@/lib/auth';
 import { formatDateTime } from '@/lib/format';
 import { money, toDMY } from '@/lib/pay';
@@ -18,7 +19,7 @@ export default function RctiArchive() {
   const [kind, setKind] = useState<'rcti' | 'payslip'>('rcti');
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { data, loading, error: loadError } = useFocusQuery(async () => {
+  const { data, loading, error: loadError, reload } = useFocusQuery(async () => {
     return unwrap(
       await supabase
         .from('rctis')
@@ -46,6 +47,29 @@ export default function RctiArchive() {
     // Same tab on web: a new tab opened after a network call is often blocked.
     if (Platform.OS === 'web') window.location.href = signed.signedUrl;
     else Linking.openURL(signed.signedUrl);
+  }
+
+  function remove(r: ArchiveRow) {
+    alert(
+      `Delete RCTI #${r.number}?`,
+      `${r.driver?.full_name ?? 'Driver'}, week ${toDMY(r.week_start)} to ${toDMY(r.week_end)}. Its PDF is deleted too. The trips and hours stay, so you can issue that week again (it gets a new number).`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setError(null);
+            const { data: gone, error: e } = await supabase.from('rctis').delete().eq('id', r.id).select('id');
+            if (e) return setError(e.message);
+            // RLS hides a blocked delete as "0 rows", so say what to do.
+            if (!gone?.length) return setError('Could not delete it. Run the 0007 SQL in Supabase, then try again.');
+            if (r.pdf_path) await supabase.storage.from('rcti-pdfs').remove([r.pdf_path]);
+            reload();
+          },
+        },
+      ],
+    );
   }
 
   const term = search.trim().toLowerCase();
@@ -127,6 +151,7 @@ export default function RctiArchive() {
               ) : (
                 <Muted>Issued before PDFs were saved. Re-issue that week on the RCTI tab to keep a copy.</Muted>
               )}
+              {isOffice && <Button title="Delete RCTI" variant="danger" onPress={() => remove(r)} />}
             </Card>
           ))}
         </>

@@ -91,4 +91,11 @@ check('driver cannot read TFNs, even their own', (await as(D, `select * from emp
 check('office reads TFN', (await as(O, `select * from employee_tfns`)).length===1);
 await q(fs.readFileSync(new URL('../migrations/0006_payslips.sql', import.meta.url), 'utf8'));
 check('0006 can be run twice', true);
+check('driver cannot delete an RCTI', (await as(D, `delete from rctis returning *`)).length===0);
+check('driver cannot delete an RCTI PDF', (await as(D, `delete from storage.objects where bucket_id='rcti-pdfs' returning *`)).length===0);
+check('office deletes an RCTI', (await as(O, `delete from rctis returning *`)).length>=1);
+check('office deletes an RCTI PDF', (await as(O, `delete from storage.objects where bucket_id='rcti-pdfs' returning *`)).length>=1);
+check('RCTI numbers are not reused after a delete', Number((await as(O, `insert into rctis (driver_id,week_start,week_end,subtotal,gst,total) values ('${D}','2026-10-19','2026-10-24',1,0,1) returning number`))[0].number) > 1);
+await q(fs.readFileSync(new URL('../migrations/0007_delete_rctis.sql', import.meta.url), 'utf8'));
+check('0007 can be run twice', true);
 if (failed) process.exit(1);
