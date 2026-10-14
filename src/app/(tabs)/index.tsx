@@ -1,0 +1,119 @@
+import { router, Stack } from 'expo-router';
+import { useState } from 'react';
+import { Text, View } from 'react-native';
+
+import { DutyCard } from '@/components/DutyCard';
+import { JobsByDay, tripTitle } from '@/components/JobsByDay';
+import { LicenceAlert } from '@/components/LicenceAlert';
+import { RunsheetList } from '@/components/RunsheetList';
+import { SignalWarning } from '@/components/SignalWarning';
+import { Badge, Button, Card, Empty, ErrorText, Hero, Loading, Muted, Row, Screen, Segmented, Title, colors } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
+import { formatDate, formatDateTime, statusColor, statusLabel } from '@/lib/format';
+import { toISODate } from '@/lib/pay';
+import { supabase } from '@/lib/supabase';
+import type { Trip } from '@/lib/types';
+import { unwrap, useFocusQuery } from '@/lib/useQuery';
+
+type Filter = 'active' | 'days' | 'runsheets' | 'archive';
+
+export default function TripsScreen() {
+  const { isOffice, profile } = useAuth();
+  const [filter, setFilter] = useState<Filter>('active');
+
+  const { data, loading, error } = useFocusQuery(async () => {
+    if (filter === 'runsheets' || filter === 'days') return [] as Trip[];
+    let q = supabase.from('trips').select('*, driver:profiles!trips_driver_id_fkey(full_name)');
+    if (filter === 'archive') return unwrap(await q.not('archived_at', 'is', null).order('trip_date', { ascending: false }).limit(200)) as Trip[];
+    q = q.is('archived_at', null);
+    // Open trips, plus everything done today so the day's jobs stay on the front page.
+    const today = toISODate(new Date());
+    q = q.or(`status.neq.completed,trip_date.eq.${today}`).order('trip_date').order('started_at', { ascending: true, nullsFirst: false });
+    return unwrap(await q.limit(200)) as Trip[];
+  }, [filter]);
+
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: isOffice ? 'Trips' : `Hi ${profile?.full_name?.split(' ')[0] ?? ''}` }} />
+      {isOffice ? (
+        <>
+          <SignalWarning showMapLink={false} />
+          <Button title="Live map: where are my drivers?" variant="secondary" onPress={() => router.push('/live-map')} />
+        </>
+      ) : (
+        <>
+          <LicenceAlert />
+          <DutyCard />
+        </>
+      )}
+      <Button title={isOffice ? '+ Plan a load for a driver' : '+ New trip'} onPress={() => router.push('/trip/new')} />
+      {!isOffice && (
+        <Button
+          title="+ Rail base to Pacific National"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/trip/new', params: { kind: 'rail' } })}
+        />
+      )}
+      {!isOffice && filter === 'active' && !!data?.filter((t) => t.status === 'planned').length && (
+        <Hero
+          label="Loads planned for you"
+          value={String(data.filter((t) => t.status === 'planned').length)}
+          sub="Set by the office. Tap a load below for the details."
+        />
+      )}
+      <Segmented
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { value: 'active', label: 'Today' },
+          { value: 'days', label: 'By day' },
+          { value: 'runsheets', label: 'Runsheets' },
+          ...(isOffice ? [{ value: 'archive' as const, label: 'Archive' }] : []),
+        ]}
+      />
+      {filter === 'runsheets' ? (
+        <RunsheetList />
+      ) : filter === 'days' ? (
+        <JobsByDay showDriver={isOffice} />
+      ) : (
+        <>
+          <ErrorText>{error}</ErrorText>
+          {loading && !data ? (
+            <Loading />
+          ) : data?.length ? (
+            data.map((t) => (
+              <Card key={t.id} onPress={() => router.push(`/trip/${t.id}`)}>
+                <Row>
+                  <Title>{tripTitle(t)}</Title>
+                </Row>
+                <Row>
+                  <Badge label={statusLabel[t.status]} color={statusColor[t.status]} />
+                  {t.status === 'planned' && t.accepted_at !== undefined && (
+                    <Badge
+                      label={t.accepted_at ? 'Accepted' : 'Not accepted'}
+                      color={t.accepted_at ? colors.success : colors.warning}
+                    />
+                  )}
+                  <Muted>
+                    {t.kind === 'rail' ? `Docket ${t.job_ref} · ` : t.customer ? `${t.customer} · ` : ''}
+                    {formatDate(t.trip_date)} · {t.truck_rego}
+                    {isOffice && t.driver ? ` · ${t.driver.full_name}` : ''}
+                  </Muted>
+                </Row>
+                {t.status === 'in_progress' && t.last_seen_at && (
+                  <View>
+                    <Text style={{ fontSize: 13 }}>Last location {formatDateTime(t.last_seen_at)}</Text>
+                  </View>
+                )}
+              </Card>
+            ))
+          ) : (
+            <Empty>
+              {filter === 'active' ? 'No trips today and nothing open. Tap New trip to add one.' : 'Nothing archived yet.'}
+            </Empty>
+          )}
+        </>
+      )}
+    </Screen>
+  );
+}

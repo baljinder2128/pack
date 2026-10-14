@@ -1,0 +1,72 @@
+# Checks that each Supabase edge function is deployed and answering, without
+# signing in. A deployed function with Verify JWT off replies 401 "Please sign
+# in again"; 404 means it isn't deployed; 401 from the gateway means Verify JWT is on.
+name: Check edge functions
+on:
+  push:
+    paths: ['.github/workflows/check-functions.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call each function
+        run: |
+          for f in manage-driver send-inspection send-rcti send-payslip abn-lookup licence-alerts; do
+            echo "=== $f"
+            curl -s -o /tmp/opt -w "OPTIONS %{http_code} allow-origin=%header{access-control-allow-origin}\n" -X OPTIONS \
+              -H "Origin: https://baljinder2128.github.io" -H "Access-Control-Request-Method: POST" \
+              -H "Access-Control-Request-Headers: authorization,x-client-info,apikey,content-type" \
+              https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/$f
+            curl -s -w "\nPOST %{http_code}\n" -X POST -H "Content-Type: application/json" -d '{}' \
+              https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/$f | head -c 400
+            echo
+          done
+      - name: Is the runsheet email code deployed?
+        run: |
+          # New licence-alerts code answers 401 "Please sign in again" here; the old code runs the daily check instead.
+          curl -s -w "\nHTTP %{http_code}\n" -X POST -H "Content-Type: application/json" \
+            -H "apikey: sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP" \
+            -d '{"runsheet_id":"00000000-0000-0000-0000-000000000000"}' \
+            https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/licence-alerts
+      - name: Is the load-accepted email code deployed?
+        run: |
+          # New licence-alerts code answers 401 "Please sign in again" for a trip_id too.
+          curl -s -w "\nHTTP %{http_code}\n" -X POST -H "Content-Type: application/json" \
+            -H "apikey: sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP" \
+            -d '{"trip_id":"00000000-0000-0000-0000-000000000000"}' \
+            https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/licence-alerts
+      - name: Are the places list, fleet numbers and photo clean-up live?
+        run: |
+          K=sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP
+          U=https://kovvxlnoezlzzlbavtez.supabase.co
+          # 200 [] means the table/column exists (rows are hidden without sign-in); an error names what's missing.
+          curl -s -w "\nplaces HTTP %{http_code}\n" "$U/rest/v1/places?select=id&limit=1" -H "apikey: $K"
+          curl -s -w "\nfleet_number HTTP %{http_code}\n" "$U/rest/v1/vehicles?select=fleet_number&limit=1" -H "apikey: $K"
+          # New licence-alerts code reports photosRemoved in the daily check's reply.
+          curl -s -w "\ndaily HTTP %{http_code}\n" -X POST -H "Content-Type: application/json" -H "apikey: $K" -d '{}' "$U/functions/v1/licence-alerts"
+      - name: Is the day report code deployed?
+        run: |
+          # New licence-alerts code answers 401 "Please sign in again" for day_report; old code runs the daily check (200).
+          curl -s -w "\nHTTP %{http_code}\n" -X POST -H "Content-Type: application/json" \
+            -H "apikey: sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP" \
+            -d '{"day_report":true}' \
+            https://kovvxlnoezlzzlbavtez.supabase.co/functions/v1/licence-alerts
+      - name: Are night shift and bases live?
+        run: |
+          K=sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP
+          U=https://kovvxlnoezlzzlbavtez.supabase.co
+          curl -s -w "\nbases HTTP %{http_code}\n" "$U/rest/v1/bases?select=id&limit=1" -H "apikey: $K"
+          curl -s -w "\nshift_type HTTP %{http_code}\n" "$U/rest/v1/profiles?select=shift_type&limit=1" -H "apikey: $K"
+      - name: Are rail trips, Visy pre-trip, breach and the 14-hour check live?
+        run: |
+          K=sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP
+          U=https://kovvxlnoezlzzlbavtez.supabase.co
+          curl -s -w "\ntrips.kind HTTP %{http_code}\n" "$U/rest/v1/trips?select=kind,base_id&limit=1" -H "apikey: $K"
+          curl -s -w "\ninspections.visy_trailer HTTP %{http_code}\n" "$U/rest/v1/inspections?select=visy_trailer&limit=1" -H "apikey: $K"
+          curl -s -w "\nduty_breach_at HTTP %{http_code}\n" "$U/rest/v1/profiles?select=duty_breach_at&limit=1" -H "apikey: $K"
+          # New licence-alerts code answers {"ok":true,"takenOffDuty":...}; old code runs the daily check instead.
+          curl -s -w "\nduty_check HTTP %{http_code}\n" -X POST -H "Content-Type: application/json" -H "apikey: $K" -d '{"duty_check":true}' "$U/functions/v1/licence-alerts"
+          # New send-inspection code is deployed when the app's pre-trip emails say FAULT (check the next one in the inbox).

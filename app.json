@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "SBT Truckin",
+    "slug": "sbt-trucking",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sbt.trucking"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.sbt.trucking"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "name": "SBT Truckin",
+      "shortName": "SBT Truckin",
+      "themeColor": "#1d4ed8",
+      "backgroundColor": "#f4f5f7"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sharing",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SBT Truckin shows your location to the office while you are on duty.",
+          "locationAlwaysAndWhenInUsePermission": "SBT Truckin keeps sharing your location with the office while you are on duty, even when the app is closed. Go off duty to stop.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "SBT Truckin uses the camera to photograph pre-trip inspection issues.",
+          "photosPermission": "SBT Truckin attaches photos to pre-trip inspection reports."
+        }
+      ]
+    ],
+    "scheme": "sbttrucking",
+    "extra": {
+      "eas": {
+        "projectId": "cb394967-c86e-42d8-87bd-1dbfdb08169c"
+      }
+    },
+    "owner": "sbt-trucking",
+    "experiments": {
+      "baseUrl": "/pack"
+    }
+  }
+}
