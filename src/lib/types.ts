@@ -18,6 +18,7 @@ export type Profile = {
   on_duty: boolean;
   on_duty_since: string | null;
   shift_type?: 'day' | 'night';
+  duty_breach_at?: string | null;
   licence_number: string | null;
   licence_class: string | null;
   licence_state: string | null;
@@ -45,6 +46,9 @@ export type TripStatus = 'planned' | 'in_progress' | 'completed';
 
 export type Trip = {
   id: string;
+  /** 'rail': a rail base taken to Pacific National (base_id + docket number in job_ref). */
+  kind?: 'load' | 'rail';
+  base_id?: string | null;
   archived_at: string | null;
   accepted_at?: string | null;
   visy_trailer?: string | null;
@@ -84,7 +88,7 @@ export type Shift = {
   driver?: { full_name: string } | null;
 };
 
-export type InspectionItem = { key: string; label: string; ok: boolean; note: string };
+export type InspectionItem = { key: string; label: string; ok: boolean; note: string; section?: 'truck' | 'trailer' };
 
 export type Inspection = {
   id: string;
@@ -92,6 +96,7 @@ export type Inspection = {
   driver_id: string;
   truck_rego: string;
   trailer_rego: string | null;
+  visy_trailer?: string | null;
   odometer: number | null;
   items: InspectionItem[];
   safe_to_drive: boolean;

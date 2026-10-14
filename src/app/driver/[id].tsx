@@ -2,12 +2,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
 import { AbnLookup } from '@/components/AbnLookup';
+import { JobsByDay } from '@/components/JobsByDay';
 import { LicencePhotos } from '@/components/LicencePhotos';
 import { formatAbn } from '@/lib/abn';
 import { Button, Card, ErrorText, Field, Loading, Muted, Screen, Segmented, Select, Title, Toggle } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { callFunction } from '@/lib/drivers';
-import { numOrNull } from '@/lib/format';
+import { formatDateTime, numOrNull } from '@/lib/format';
 import { LICENCE_CLASSES, STATES } from '@/lib/licence';
 import { parseDateInput, toDMY } from '@/lib/pay';
 import { cleanTfn, formatTfn, isValidTfn } from '@/lib/tfn';
@@ -48,6 +49,8 @@ export default function DriverScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  // Their jobs come first; details (pay, licence, login) are the second page.
+  const [view, setView] = useState<'jobs' | 'details'>('jobs');
   const set = (key: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [key]: v }));
 
   const { data: driver, loading, reload } = useFocusQuery(async () => {
@@ -185,8 +188,8 @@ export default function DriverScreen() {
   if (!driver) return <ErrorText>Not found</ErrorText>;
   const isSelf = driver.id === session?.user.id;
 
-  return (
-    <Screen>
+  const header = (
+    <>
       <Card>
         <Title>{driver.full_name}</Title>
         <Muted>{driver.email}</Muted>
@@ -197,7 +200,32 @@ export default function DriverScreen() {
             : 'Has not agreed to location tracking yet'}
           {driver.on_duty ? ' · On duty now' : ''}
         </Muted>
+        {driver.duty_breach_at && (
+          <Muted>Last over-14-hours breach: {formatDateTime(driver.duty_breach_at)}</Muted>
+        )}
       </Card>
+      <Segmented
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'jobs', label: 'Jobs by day' },
+          { value: 'details', label: 'Details' },
+        ]}
+      />
+    </>
+  );
+
+  if (view === 'jobs')
+    return (
+      <Screen>
+        {header}
+        <JobsByDay driverId={driver.id} days={30} />
+      </Screen>
+    );
+
+  return (
+    <Screen>
+      {header}
       {!isSelf && (
         <Segmented
           value={role}

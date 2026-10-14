@@ -1,3 +1,4 @@
+import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -7,6 +8,7 @@ import { Card, Empty, ErrorText, Loading, Muted, Screen, Title, colors, styles }
 import { listDrivers } from '@/lib/drivers';
 import { formatDate, formatTime } from '@/lib/format';
 import { addDays, parseISODate, toISODate } from '@/lib/pay';
+import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useFocusQuery } from '@/lib/useQuery';
 
@@ -22,7 +24,14 @@ function km(a: Point, b: Point): number {
 }
 
 /** Office: where a driver went on any of the last 7 days. */
-export default function RouteHistory() {
+// Only the office sees where drivers are (Billa, 2026-10-14).
+export default function RouteHistoryScreen() {
+  const { isOffice, loading } = useAuth();
+  if (loading) return null;
+  return isOffice ? <RouteHistory /> : <Redirect href="/" />;
+}
+
+function RouteHistory() {
   const today = toISODate(new Date());
   const days = [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(today, -i));
   const [day, setDay] = useState(today);

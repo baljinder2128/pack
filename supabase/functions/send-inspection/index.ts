@@ -7,7 +7,7 @@
 //   supabase.functions.invoke('send-inspection', { body: { inspection_id } })
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-type Item = { key: string; label: string; ok: boolean; note?: string };
+type Item = { key: string; label: string; ok: boolean; note?: string; section?: 'truck' | 'trailer' };
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -87,9 +87,12 @@ Deno.serve(async (req) => {
 
   const rows = items
     .map(
-      (it) =>
+      (it, i) =>
+        (it.section !== items[i - 1]?.section
+          ? `<tr><td colspan="3" style="padding:8px 8px 4px;font-weight:700;background:#f3f4f6">${it.section === 'trailer' ? 'Trailer' : 'Truck'}</td></tr>`
+          : '') +
         `<tr><td style="padding:4px 8px">${escapeHtml(it.label)}</td>` +
-        `<td style="padding:4px 8px;color:${it.ok ? '#15803d' : '#b91c1c'};font-weight:600">${it.ok ? 'OK' : 'DEFECT'}</td>` +
+        `<td style="padding:4px 8px;color:${it.ok ? '#15803d' : '#b91c1c'};font-weight:600">${it.ok ? 'OK' : 'FAULT'}</td>` +
         `<td style="padding:4px 8px">${escapeHtml(it.note)}</td></tr>`,
     )
     .join('');
@@ -98,9 +101,9 @@ Deno.serve(async (req) => {
     <h2 style="margin:0 0 8px">Pre-trip inspection: ${escapeHtml(insp.truck_rego)}</h2>
     <p style="margin:0 0 4px"><b>Driver:</b> ${escapeHtml(driverName)} ${escapeHtml(insp.driver?.phone ?? '')}</p>
     <p style="margin:0 0 4px"><b>When:</b> ${escapeHtml(when)}</p>
-    <p style="margin:0 0 4px"><b>Trailer:</b> ${escapeHtml(insp.trailer_rego || '-')} &nbsp; <b>Odometer:</b> ${escapeHtml(insp.odometer ?? '-')}</p>
+    <p style="margin:0 0 4px"><b>Trailer:</b> ${escapeHtml(insp.trailer_rego || '-')}${insp.visy_trailer ? ` &nbsp; <b>Visy trailer:</b> ${escapeHtml(insp.visy_trailer)}` : ''} &nbsp; <b>Odometer:</b> ${escapeHtml(insp.odometer ?? '-')}</p>
     <p style="margin:8px 0;font-size:16px;font-weight:700;color:${insp.safe_to_drive ? '#15803d' : '#b91c1c'}">
-      ${insp.safe_to_drive ? 'Safe to drive' : 'NOT SAFE TO DRIVE'} &middot; ${defects.length} defect(s)
+      ${insp.safe_to_drive ? 'Safe to drive' : 'NOT SAFE TO DRIVE'} &middot; ${defects.length} fault(s)
     </p>
     <table style="border-collapse:collapse;border:1px solid #ddd">${rows}</table>
     ${insp.notes ? `<p><b>Notes:</b> ${escapeHtml(insp.notes)}</p>` : ''}
@@ -108,7 +111,7 @@ Deno.serve(async (req) => {
 
   const subject =
     `${insp.safe_to_drive ? '' : 'NOT SAFE: '}Pre-trip ${insp.truck_rego} - ${driverName}` +
-    (defects.length ? ` (${defects.length} defect${defects.length > 1 ? 's' : ''})` : '');
+    (defects.length ? ` (${defects.length} fault${defects.length > 1 ? 's' : ''})` : '');
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',

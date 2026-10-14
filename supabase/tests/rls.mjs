@@ -141,6 +141,8 @@ await q(fs.readFileSync(new URL('../migrations/0009_licence_renewals.sql', impor
 check('0009 can be run twice', true);
 
 // 0010: hours in a week with an issued RCTI or payslip are office-only.
+// (Re-run 0010 first: 0019 later made all hours office-only.)
+await q(fs.readFileSync(new URL('../migrations/0010_pay_lock.sql', import.meta.url), 'utf8'));
 await as(D, `insert into shifts (driver_id,shift_date,start_at,end_at) values ('${D}','2026-10-05','2026-10-05 07:00+10','2026-10-05 15:00+10')`);
 check('driver adds hours in an unpaid week', (await as(D, `select * from shifts where shift_date='2026-10-05'`)).length===1);
 await as(O, `insert into rctis (driver_id,week_start,week_end,subtotal,gst,total) values ('${D}','2026-10-05','2026-10-10',1,0,1)`);
@@ -222,4 +224,16 @@ check('office sees bases', (await as(O, `select * from bases`)).length >= 1);
 check('driver sets night shift', (await as(D, `update profiles set shift_type='night' where id='${D}' returning shift_type`)).length===1);
 await q(fs.readFileSync(new URL('../migrations/0018_night_shift_bases.sql', import.meta.url), 'utf8'));
 check('0018 can be run twice', true);
+// 0019: rail trips, office-only hours.
+await q(fs.readFileSync(new URL('../migrations/0019_rail_trips_auto_hours.sql', import.meta.url), 'utf8'));
+check('driver logs a rail trip', !String(await as(D, `insert into trips (driver_id,kind,base_id,job_ref,pickup,dropoff,truck_rego) values ('${D}','rail','IFRU1234567','D9','Rail base','Pacific National','T1')`)).startsWith('ERR'));
+check('rail trip needs a docket', String(await as(D, `insert into trips (driver_id,kind,base_id,pickup,dropoff,truck_rego) values ('${D}','rail','IFRU1234567','Rail base','Pacific National','T1')`)).startsWith('ERR'));
+check('rail trip base ID must be IFRU + 7 digits', String(await as(D, `insert into trips (driver_id,kind,base_id,job_ref,pickup,dropoff,truck_rego) values ('${D}','rail','IFRU12345','D9','Rail base','Pacific National','T1')`)).startsWith('ERR'));
+check('driver cannot add hours', String(await as(D, `insert into shifts (driver_id,shift_date,start_at,end_at) values ('${D}','2026-12-02','2026-12-02 07:00+10','2026-12-02 15:00+10')`)).startsWith('ERR'));
+check('driver cannot change hours', (await as(D, `update shifts set break_minutes=0 where driver_id='${D}' returning *`)).length===0);
+check('driver cannot delete hours', (await as(D, `delete from shifts where driver_id='${D}' returning *`)).length===0);
+check('driver still sees unpaid hours', (await as(D, `select * from shifts where shift_date='2026-11-30'`)).length===1);
+check('office adds hours', !String(await as(O, `insert into shifts (driver_id,shift_date,start_at,end_at) values ('${D}','2026-12-02','2026-12-02 07:00+10','2026-12-02 15:00+10')`)).startsWith('ERR'));
+await q(fs.readFileSync(new URL('../migrations/0019_rail_trips_auto_hours.sql', import.meta.url), 'utf8'));
+check('0019 can be run twice', true);
 if (failed) process.exit(1);

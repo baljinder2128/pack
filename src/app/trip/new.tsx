@@ -1,6 +1,7 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 
+import { cleanBaseId, isBaseId } from '@/components/BaseLog';
 import { DriverPicker } from '@/components/DriverPicker';
 import { CustomerPicker, PlacePicker } from '@/components/PlacePicker';
 import { RegoPicker } from '@/components/RegoPicker';
@@ -14,8 +15,10 @@ import type { Profile, Trip } from '@/lib/types';
 
 export default function NewTrip() {
   // With ?id= the office is changing a planned load.
-  const { id: editId } = useLocalSearchParams<{ id?: string }>();
-  const { session, isOffice } = useAuth();
+  // With ?kind=rail a driver logs a rail base taken to Pacific National.
+  const { id: editId, kind } = useLocalSearchParams<{ id?: string; kind?: string }>();
+  const rail = kind === 'rail';
+  const { session, isOffice, profile } = useAuth();
   const [drivers, setDrivers] = useState<Profile[]>([]);
   // Office plans loads for a driver, so they choose who; drivers log their own.
   const [driverId, setDriverId] = useState<string | null>(isOffice ? null : session?.user.id ?? null);
@@ -30,6 +33,7 @@ export default function NewTrip() {
     dropoff: '',
     start_odometer: '',
     notes: '',
+    base_id: '',
   });
   const [origDriver, setOrigDriver] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,6 +63,7 @@ export default function NewTrip() {
           dropoff: t.dropoff ?? '',
           start_odometer: t.start_odometer ? String(t.start_odometer) : '',
           notes: t.notes ?? '',
+          base_id: t.base_id ?? '',
         });
       });
   }, [editId]);
@@ -70,6 +75,9 @@ export default function NewTrip() {
   async function save() {
     const tripDate = parseDateInput(form.trip_date);
     if (!tripDate) return setError('Enter the date like 13/10/2026.');
+    // Hours run from the first trip of the shift, so drivers go on duty first.
+    if (!isOffice && !editId && !profile?.on_duty) return setError('Go on duty first (Trips screen), then add the trip.');
+    if (rail) return saveRail(tripDate);
     if (!form.truck_rego.trim() || !form.pickup.trim() || !form.dropoff.trim())
       return setError('Truck rego, pickup and drop-off are required.');
     if (!driverId) return setError('Choose a driver.');
@@ -102,6 +110,67 @@ export default function NewTrip() {
     if (error) return setError(error.message);
     router.replace(`/trip/${data.id}`);
   }
+
+  async function saveRail(tripDate: string) {
+    const baseId = cleanBaseId(form.base_id);
+    if (!isBaseId(baseId)) return setError('Base ID must be IFRU followed by 7 digits, like IFRU1234567.');
+    if (!form.job_ref.trim()) return setError('Enter the docket number.');
+    if (!form.truck_rego.trim()) return setError('Enter the truck rego.');
+    if (!driverId) return setError('Sign in again.');
+    setBusy(true);
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('trips')
+      .insert({
+        driver_id: driverId,
+        kind: 'rail',
+        base_id: baseId,
+        job_ref: form.job_ref.trim(),
+        trip_date: tripDate,
+        truck_rego: form.truck_rego.trim().toUpperCase(),
+        trailer_rego: form.trailer_rego.trim().toUpperCase() || null,
+        customer: 'Pacific National',
+        pickup: form.pickup.trim() || 'Rail base',
+        dropoff: 'Pacific National',
+        amount: 0,
+        notes: form.notes.trim() || null,
+        // A rail lodgement is logged once it's done.
+        status: 'completed',
+        started_at: now,
+        finished_at: now,
+      })
+      .select('id')
+      .single();
+    setBusy(false);
+    if (error)
+      return setError(/kind|base_id|schema cache/i.test(error.message) ? `${error.message}. The office needs to run the 0019 SQL in Supabase.` : error.message);
+    router.replace(`/trip/${data.id}`);
+  }
+
+  if (rail)
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: 'Rail base to Pacific National' }} />
+        <Muted>Log each rail base you take to Pacific National. It goes to the office with your runsheet.</Muted>
+        <Field label="Date (DD/MM/YYYY)" value={form.trip_date} onChangeText={set('trip_date')} />
+        <Field
+          label="Base ID (IFRU + 7 digits)"
+          value={form.base_id}
+          onChangeText={(v) => set('base_id')(cleanBaseId(v).slice(0, 11))}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          placeholder="IFRU1234567"
+          maxLength={11}
+        />
+        <Field label="Docket number" value={form.job_ref} onChangeText={set('job_ref')} autoCapitalize="characters" />
+        <RegoPicker kind="truck" label="Truck rego" value={form.truck_rego} onChange={set('truck_rego')} />
+        <RegoPicker kind="trailer" label="Trailer rego" value={form.trailer_rego} onChange={set('trailer_rego')} />
+        <PlacePicker use="pickup" label="Collected from (optional)" value={form.pickup} onChange={set('pickup')} />
+        <Field label="Notes" value={form.notes} onChangeText={set('notes')} multiline />
+        <ErrorText>{error}</ErrorText>
+        <Button title="Save rail base" onPress={save} busy={busy} />
+      </Screen>
+    );
 
   return (
     <Screen>

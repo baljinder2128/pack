@@ -26,7 +26,7 @@ async function currentPosition(): Promise<{ lat: number; lng: number } | null> {
 
 export default function TripDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { session, isOffice } = useAuth();
+  const { session, isOffice, profile } = useAuth();
   const [endOdo, setEndOdo] = useState('');
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
@@ -71,6 +71,8 @@ export default function TripDetail() {
   }
 
   async function start() {
+    // Hours are logged from the first trip of the shift, so drivers go on duty first.
+    if (isMine && !profile?.on_duty) return setActionError('Go on duty first (Trips screen), then start the trip.');
     const pos = await currentPosition();
     const now = new Date().toISOString();
     update({
@@ -134,14 +136,13 @@ export default function TripDetail() {
   if (loading && !trip) return <Loading />;
   if (!trip) return <ErrorText>{error ?? 'Trip not found'}</ErrorText>;
 
+  const rail = trip.kind === 'rail';
   const km = trip.start_odometer && trip.end_odometer ? trip.end_odometer - trip.start_odometer : null;
 
   return (
     <Screen>
       <Card>
-        <Title>
-          {trip.pickup} → {trip.dropoff}
-        </Title>
+        <Title>{rail ? `Rail base ${trip.base_id} → Pacific National` : `${trip.pickup} → ${trip.dropoff}`}</Title>
         <Row>
           <Badge label={statusLabel[trip.status]} color={statusColor[trip.status]} />
           <Muted>{formatDate(trip.trip_date)}</Muted>
@@ -153,7 +154,8 @@ export default function TripDetail() {
         </Text>
         {trip.visy_trailer && <Text>Visy trailer: {trip.visy_trailer}</Text>}
         {trip.customer && <Text>Customer: {trip.customer}</Text>}
-        {trip.job_ref && <Text>Job: {trip.job_ref}</Text>}
+        {trip.job_ref && <Text>{rail ? 'Docket' : 'Job'}: {trip.job_ref}</Text>}
+        {rail && trip.pickup && trip.pickup !== 'Rail base' && <Text>Collected from: {trip.pickup}</Text>}
         <Text>
           Odometer: {trip.start_odometer ?? '-'} → {trip.end_odometer ?? '-'}
           {km !== null ? ` (${km} km)` : ''}
@@ -169,7 +171,8 @@ export default function TripDetail() {
         {trip.notes && <Muted>{trip.notes}</Muted>}
       </Card>
 
-      {trip.last_lat !== null && trip.last_lng !== null && (
+      {/* Only the office sees where drivers are. */}
+      {isOffice && trip.last_lat !== null && trip.last_lng !== null && (
         <Button
           title={`Show on map (${formatDateTime(trip.last_seen_at)})`}
           variant="secondary"

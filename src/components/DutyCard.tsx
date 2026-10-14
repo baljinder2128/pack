@@ -4,7 +4,7 @@ import { Linking, Platform, Text } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
 import { formatTime } from '@/lib/format';
-import { clock24, toISODate } from '@/lib/pay';
+import { toISODate } from '@/lib/pay';
 import { supabase } from '@/lib/supabase';
 import { callFunction } from '@/lib/drivers';
 import { getSendStatus, onSendStatus, sendCurrentPosition, startTracking, stopTracking, type SendStatus } from '@/lib/tracking';
@@ -86,34 +86,27 @@ export function DutyCard() {
       }
     }
     await stopTracking();
-    await supabase.from('profiles').update({ on_duty: false }).eq('id', profile.id);
-    // Email the office this driver's day report (time on duty, trips, paperwork).
-    const reportError = since
-      ? await callFunction('licence-alerts', { day_report: true }).then(
-          () => null,
-          (e) => (e instanceof Error ? e.message : String(e)),
+    // The server logs the hours (first trip to now), takes them off duty and emails
+    // the office the day report.
+    const report = since
+      ? await callFunction<{ hours: { start: string; end: string; minutes: number } | null }>('licence-alerts', { day_report: true }).then(
+          (r) => ({ hours: r.hours, error: null }),
+          (e) => ({ hours: null, error: e instanceof Error ? e.message : String(e) }),
         )
-      : null;
+      : { hours: null, error: null };
+    await supabase.from('profiles').update({ on_duty: false }).eq('id', profile.id);
     await refreshProfile();
     setBusy(false);
-    if (reportError) setError(`Off duty, but the day report to the office didn't send: ${reportError}`);
-    if (since) {
-      const start = new Date(since);
-      alert('Off duty', 'Log these hours now?', [
-        { text: 'Not now', style: 'cancel' },
-        {
-          text: 'Log hours',
-          onPress: () =>
-            router.push({
-              pathname: '/shift/new',
-              params: {
-                date: toISODate(start),
-                start: clock24(start),
-                end: clock24(new Date()),
-              },
-            }),
-        },
-      ]);
+    if (report.error) {
+      setError(`Off duty, but your hours and day report didn't reach the office: ${report.error}. Call the office.`);
+    } else if (since) {
+      const h = report.hours;
+      alert(
+        'Off duty',
+        h
+          ? `Hours logged: ${formatTime(h.start)} to ${formatTime(h.end)} (${Math.floor(h.minutes / 60)}h ${h.minutes % 60}m). The office has your day report.`
+          : 'No hours were logged because no trip was accepted or entered this shift. Call the office if you worked.',
+      );
     }
   }
 

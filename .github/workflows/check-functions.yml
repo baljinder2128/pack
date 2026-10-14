@@ -60,3 +60,13 @@ jobs:
           U=https://kovvxlnoezlzzlbavtez.supabase.co
           curl -s -w "\nbases HTTP %{http_code}\n" "$U/rest/v1/bases?select=id&limit=1" -H "apikey: $K"
           curl -s -w "\nshift_type HTTP %{http_code}\n" "$U/rest/v1/profiles?select=shift_type&limit=1" -H "apikey: $K"
+      - name: Are rail trips, Visy pre-trip, breach and the 14-hour check live?
+        run: |
+          K=sb_publishable_ycu7wSo6tIKgqQ_Vs44m9A_LL7G1weP
+          U=https://kovvxlnoezlzzlbavtez.supabase.co
+          curl -s -w "\ntrips.kind HTTP %{http_code}\n" "$U/rest/v1/trips?select=kind,base_id&limit=1" -H "apikey: $K"
+          curl -s -w "\ninspections.visy_trailer HTTP %{http_code}\n" "$U/rest/v1/inspections?select=visy_trailer&limit=1" -H "apikey: $K"
+          curl -s -w "\nduty_breach_at HTTP %{http_code}\n" "$U/rest/v1/profiles?select=duty_breach_at&limit=1" -H "apikey: $K"
+          # New licence-alerts code answers {"ok":true,"takenOffDuty":...}; old code runs the daily check instead.
+          curl -s -w "\nduty_check HTTP %{http_code}\n" -X POST -H "Content-Type: application/json" -H "apikey: $K" -d '{"duty_check":true}' "$U/functions/v1/licence-alerts"
+          # New send-inspection code is deployed when the app's pre-trip emails say FAULT (check the next one in the inbox).

@@ -80,6 +80,15 @@ export default function NewShift() {
     router.back();
   }
 
+  if (!isOffice)
+    return (
+      <Screen>
+        <Text style={{ color: colors.muted, fontSize: 16 }}>
+          Your hours are logged automatically, from your first trip of the shift to going off duty. Only the office can change them.
+        </Text>
+      </Screen>
+    );
+
   return (
     <Screen>
       {editing && <Stack.Screen options={{ title: 'Edit hours' }} />}

@@ -55,7 +55,12 @@ export default function HoursScreen() {
 
   return (
     <Screen>
-      <Button title="+ Log hours" onPress={() => router.push('/shift/new')} />
+      {isOffice ? (
+        <Button title="+ Log hours" onPress={() => router.push('/shift/new')} />
+      ) : (
+        // Hours log themselves: first trip accepted or entered, to going off duty (Billa, 2026-10-14).
+        <Muted>Your hours are logged automatically, from your first trip of the shift to going off duty. Call the office if they need changing.</Muted>
+      )}
       <WeekNav start={start} onChange={setStart} />
       <ErrorText>{error}</ErrorText>
       {totals.size > 0 && (
@@ -96,6 +101,7 @@ export default function HoursScreen() {
               {isOffice && s.driver ? ` · ${s.driver.full_name}` : ''}
             </Muted>
             {s.notes && <Muted>{s.notes}</Muted>}
+            {isOffice && (
             <Row>
               <Text
                 style={{ color: colors.primary, fontWeight: '600', marginTop: 4, marginRight: 24 }}
@@ -107,6 +113,7 @@ export default function HoursScreen() {
                 Delete
               </Text>
             </Row>
+            )}
           </Card>
         ))
       ) : (

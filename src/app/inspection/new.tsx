@@ -27,6 +27,8 @@ export default function NewInspection() {
   const { session } = useAuth();
   const [truck, setTruck] = useState(params.truck ?? '');
   const [trailer, setTrailer] = useState(params.trailer ?? '');
+  const [visy, setVisy] = useState('');
+  const [hasTrailer, setHasTrailer] = useState(true);
   const [odometer, setOdometer] = useState('');
   const [items, setItems] = useState<InspectionItem[]>(freshChecklist);
   const [safe, setSafe] = useState(true);
@@ -55,8 +57,8 @@ export default function NewInspection() {
   async function submit() {
     if (!session) return;
     if (!truck.trim()) return setError('Enter the truck rego.');
-    const missingNote = items.find((it) => !it.ok && !it.note.trim());
-    if (missingNote) return setError(`Describe the problem with "${missingNote.label}".`);
+    const missingNote = checked.find((it) => !it.ok && !it.note.trim());
+    if (missingNote) return setError(`Describe the fault with "${missingNote.label}".`);
     setError(null);
     setBusy(true);
     try {
@@ -80,14 +82,16 @@ export default function NewInspection() {
         driver_id: session.user.id,
         trip_id: params.trip_id || null,
         truck_rego: truck.trim().toUpperCase(),
-        trailer_rego: trailer.trim().toUpperCase() || null,
+        trailer_rego: hasTrailer ? trailer.trim().toUpperCase() || null : null,
+        ...(hasTrailer && visy.trim() ? { visy_trailer: visy.trim().toUpperCase() } : {}),
         odometer: numOrNull(odometer),
-        items,
+        items: checked,
         safe_to_drive: safe,
         notes: notes.trim() || null,
         photo_paths: paths,
       });
-      if (insertError) throw new Error(insertError.message);
+      if (insertError)
+        throw new Error(/visy_trailer|schema cache/i.test(insertError.message) ? `${insertError.message}. The office needs to run the 0019 SQL in Supabase.` : insertError.message);
 
       setStatus('Emailing the office…');
       try {
@@ -109,28 +113,43 @@ export default function NewInspection() {
     }
   }
 
-  const defects = items.filter((it) => !it.ok).length;
+  const checked = hasTrailer ? items : items.filter((it) => it.section !== 'trailer');
+  const defects = checked.filter((it) => !it.ok).length;
+
+  const checkCard = (it: InspectionItem) => (
+    <Card key={it.key}>
+      <Row>
+        <Text style={{ flex: 1, fontSize: 15, fontWeight: '600' }}>{it.label}</Text>
+        <Choice label="OK" active={it.ok} color={colors.success} onPress={() => setItem(it.key, { ok: true })} />
+        <Choice label="Fault" active={!it.ok} color={colors.danger} onPress={() => setItem(it.key, { ok: false })} />
+      </Row>
+      {!it.ok && <Field label="What's the fault?" value={it.note} onChangeText={(note) => setItem(it.key, { note })} multiline />}
+    </Card>
+  );
 
   return (
     <Screen>
       <RegoPicker kind="truck" label="Truck rego" value={truck} onChange={setTruck} />
-      <RegoPicker kind="trailer" label="Trailer rego" value={trailer} onChange={setTrailer} />
       <Field label="Odometer (km)" value={odometer} onChangeText={setOdometer} keyboardType="number-pad" />
 
-      <Title>Checks</Title>
-      <Muted>Tap "Problem" on anything that needs reporting and describe it.</Muted>
-      {items.map((it) => (
-        <Card key={it.key}>
-          <Row>
-            <Text style={{ flex: 1, fontSize: 15, fontWeight: '600' }}>{it.label}</Text>
-            <Choice label="OK" active={it.ok} color={colors.success} onPress={() => setItem(it.key, { ok: true })} />
-            <Choice label="Problem" active={!it.ok} color={colors.danger} onPress={() => setItem(it.key, { ok: false })} />
-          </Row>
-          {!it.ok && (
-            <Field label="What's wrong?" value={it.note} onChangeText={(note) => setItem(it.key, { note })} multiline />
-          )}
-        </Card>
-      ))}
+      <Title>Truck checks</Title>
+      <Muted>Tap "Fault" on anything that needs reporting and describe it.</Muted>
+      {items.filter((it) => it.section !== 'trailer').map(checkCard)}
+
+      <Title>Trailer checks</Title>
+      <Toggle label="Towing a trailer today" value={hasTrailer} onChange={setHasTrailer} />
+      {hasTrailer && (
+        <>
+          <RegoPicker kind="trailer" label="Trailer rego" value={trailer} onChange={setTrailer} />
+          <Field
+            label="Visy trailer number (if it's a Visy trailer)"
+            value={visy}
+            onChangeText={setVisy}
+            autoCapitalize="characters"
+          />
+          {items.filter((it) => it.section === 'trailer').map(checkCard)}
+        </>
+      )}
 
       <Title>Photos</Title>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -152,7 +171,7 @@ export default function NewInspection() {
 
       <Field label="Other notes" value={notes} onChangeText={setNotes} multiline />
       <Toggle label="Vehicle is safe to drive" value={safe} onChange={setSafe} />
-      {defects > 0 && <Text style={{ color: colors.warning }}>{defects} problem(s) will be reported.</Text>}
+      {defects > 0 && <Text style={{ color: colors.warning }}>{defects} fault(s) will be reported.</Text>}
       <ErrorText>{error}</ErrorText>
       {status && <Muted>{status}</Muted>}
       <Button title="Submit & email office" onPress={submit} busy={busy} />

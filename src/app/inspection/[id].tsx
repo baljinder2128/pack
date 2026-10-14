@@ -62,6 +62,7 @@ export default function InspectionDetail() {
         <Text>Driver: {insp.driver?.full_name ?? '-'}</Text>
         <Text>When: {formatDateTime(insp.created_at)}</Text>
         {insp.trailer_rego && <Text>Trailer: {insp.trailer_rego}</Text>}
+        {insp.visy_trailer && <Text>Visy trailer: {insp.visy_trailer}</Text>}
         {insp.odometer !== null && <Text>Odometer: {insp.odometer} km</Text>}
         <Muted>
           {insp.emailed_at
@@ -70,12 +71,15 @@ export default function InspectionDetail() {
         </Muted>
       </Card>
       <Card>
-        {insp.items.map((it) => (
+        {insp.items.map((it, i) => (
           <View key={it.key} style={{ paddingVertical: 4 }}>
+            {it.section !== insp.items[i - 1]?.section && (
+              <Text style={{ fontWeight: '800', marginTop: i ? 8 : 0 }}>{it.section === 'trailer' ? 'Trailer' : 'Truck'}</Text>
+            )}
             <Row>
               <Text style={{ flex: 1 }}>{it.label}</Text>
               <Text style={{ fontWeight: '700', color: it.ok ? colors.success : colors.danger }}>
-                {it.ok ? 'OK' : 'PROBLEM'}
+                {it.ok ? 'OK' : 'FAULT'}
               </Text>
             </Row>
             {!it.ok && <Muted>{it.note}</Muted>}

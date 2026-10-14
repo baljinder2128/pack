@@ -41,7 +41,7 @@ export default function InspectionsScreen() {
               <Title>{i.truck_rego}</Title>
               <Row>
                 <Badge
-                  label={!i.safe_to_drive ? 'Not safe' : defects ? `${defects} defect(s)` : 'All OK'}
+                  label={!i.safe_to_drive ? 'Not safe' : defects ? `${defects} fault(s)` : 'All OK'}
                   color={!i.safe_to_drive ? colors.danger : defects ? colors.warning : colors.success}
                 />
                 <Muted>

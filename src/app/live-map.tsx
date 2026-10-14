@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, Redirect } from 'expo-router';
 import { createElement, useEffect, useRef, useState } from 'react';
 import { Linking, Platform, Share, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -7,6 +7,7 @@ import { Button, Card, Empty, ErrorText, Muted, Row, Screen, Title, colors } fro
 import { SignalWarning, STALE_MS } from '@/components/SignalWarning';
 import { alert } from '@/lib/alert';
 import { formatDateTime, formatTime } from '@/lib/format';
+import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { mapsLink } from '@/lib/tracking';
 import type { LiveDriver } from '@/lib/types';
@@ -16,7 +17,14 @@ const REFRESH_MS = 30 * 1000;
 // Only drivers who sent a location in the last 30 minutes go on the map.
 const ACTIVE_MS = 30 * 60 * 1000;
 
-export default function LiveMap() {
+// Only the office sees where drivers are (Billa, 2026-10-14).
+export default function LiveMapScreen() {
+  const { isOffice, loading } = useAuth();
+  if (loading) return null;
+  return isOffice ? <LiveMap /> : <Redirect href="/" />;
+}
+
+function LiveMap() {
   const web = useRef<WebView>(null);
   const frame = useRef<HTMLIFrameElement | null>(null);
   const [ready, setReady] = useState(false);
